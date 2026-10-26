@@ -146,6 +146,54 @@ export type ThemeReport = z.infer<typeof ThemeReport>;
 export const SavedTheme = z.object({ name: z.string(), version: z.number().int(), created: z.string() });
 export type SavedTheme = z.infer<typeof SavedTheme>;
 
+export const PrivateDns = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("keep") }), z.object({ mode: z.literal("automatic") }), z.object({ mode: z.literal("off") }),
+  z.object({ mode: z.literal("hostname"), hostname: z.string() }),
+]);
+export const Profile = z.object({
+  version: z.number().int(),
+  name: z.string(),
+  device_identity: z.string().nullable(),
+  launcher: z.object({ install: z.boolean(), make_home: z.boolean(), disable_stock: z.boolean() }),
+  debloat: z.object({ packages: z.array(z.string()), confirmed: z.array(z.string()) }),
+  settings: z.object({ animation_scale: z.string().nullable(), private_dns: PrivateDns }),
+  apply_theme: z.boolean(),
+});
+export type Profile = z.infer<typeof Profile>;
+export const emptyProfile = (name = "My TV setup"): Profile => ({
+  version: 1, name, device_identity: null,
+  launcher: { install: false, make_home: false, disable_stock: false },
+  debloat: { packages: [], confirmed: [] },
+  settings: { animation_scale: null, private_dns: { mode: "keep" } },
+  apply_theme: false,
+});
+
+export const PlanPreview = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("check"), detail: z.string() }),
+  z.object({ state: z.literal("will_change"), detail: z.string() }),
+  z.object({ state: z.literal("already_done"), detail: z.string() }),
+  z.object({ state: z.literal("blocked"), detail: z.string() }),
+]);
+export const PlanStep = z.object({ id: z.string(), title: z.string(), kind: z.object({ kind: z.string() }).passthrough(), depends_on: z.array(z.string()), critical: z.boolean(), preview: PlanPreview });
+export type PlanStep = z.infer<typeof PlanStep>;
+export const Plan = z.object({ identity: z.string(), sdk: z.number(), steps: z.array(PlanStep), runnable: z.boolean(), notes: z.array(z.string()) });
+export type Plan = z.infer<typeof Plan>;
+export const StepStatus = z.enum(["running", "done", "already_done", "failed", "skipped", "reconnecting"]);
+export type StepStatus = z.infer<typeof StepStatus>;
+export const DeployEvent = z.object({ step: z.string(), title: z.string(), status: StepStatus, message: z.string(), finished: z.number(), total: z.number() });
+export type DeployEvent = z.infer<typeof DeployEvent>;
+export const RunReport = z.object({
+  results: z.array(z.object({ id: z.string(), title: z.string(), status: StepStatus, message: z.string() })),
+  completed: z.boolean(), cancelled: z.boolean(), stopped: z.string().nullable(),
+});
+export type RunReport = z.infer<typeof RunReport>;
+export const RunResult = z.object({ deployment_id: z.number(), plan: Plan, report: RunReport });
+export type RunResult = z.infer<typeof RunResult>;
+export const Interrupted = z.object({ id: z.number(), started: z.string(), name: z.string(), last_step: z.string().nullable() });
+export const HistoryRow = z.object({ id: z.number(), started: z.string(), finished: z.string().nullable(), status: z.string(), name: z.string(), can_undo: z.boolean() });
+export type HistoryRow = z.infer<typeof HistoryRow>;
+export type ThemeIn = { config: Record<string, unknown>; wallpapers: { name: string; data_base64: string }[]; captions: string | null };
+
 export const CmdError = z.object({
   kind: z.enum(["store", "transport", "invalid"]),
   message: z.unknown(),
@@ -218,8 +266,26 @@ export const api = {
   saveThemeVersion: (name: string, theme: unknown) => call("save_theme_version", z.number().int(), { name, theme }),
   listThemeVersions: () => call("list_theme_versions", z.array(SavedTheme)),
   loadThemeVersion: (name: string, version: number) => call("load_theme_version", z.unknown(), { name, version }),
+  deployPlan: (serial: string, profile: Profile, theme: ThemeIn | null) => call("deploy_plan", Plan, { serial, request: { profile, theme } }),
+  deployRun: (serial: string, profile: Profile, theme: ThemeIn | null) => call("deploy_run", RunResult, { serial, request: { profile, theme } }),
+  deployCancel: () => call("deploy_cancel", z.null()),
+  deployInterrupted: (serial: string) => call("deploy_interrupted", Interrupted.nullable(), { serial }),
+  deployResume: (serial: string, deploymentId: number) => call("deploy_resume", RunResult, { serial, deploymentId }),
+  deployDiscard: (deploymentId: number) => call("deploy_discard", z.null(), { deploymentId }),
+  deployHistory: (serial: string) => call("deploy_history", z.array(HistoryRow), { serial }),
+  undoDeployment: (serial: string, deploymentId: number) => call("undo_deployment", ChangeReport, { serial, deploymentId }),
+  saveDeployProfile: (profile: Profile) => call("save_deploy_profile", z.number().int(), { profile }),
+  listDeployProfiles: () => call("list_deploy_profiles", z.array(SavedTheme)),
+  loadDeployProfile: (name: string, version: number) => call("load_deploy_profile", Profile, { name, version }),
+  importDeployProfile: (jsonText: string) => call("import_deploy_profile", Profile, { jsonText }),
   restoreApply: (serial: string, scope: string[] | null) => call("restore_apply", ChangeReport, { serial, scope }),
 };
+
+/** Subscribe to deployment step events. */
+export async function onDeployEvent(cb: (e: DeployEvent) => void): Promise<() => void> {
+  if (!inTauri()) return () => {};
+  return listen("deploy-event", (e) => { const r = DeployEvent.safeParse(e.payload); if (r.success) cb(r.data); });
+}
 
 /** Subscribe to batch progress; returns an unsubscribe function (no-op outside Tauri). */
 export async function onProgress(cb: (p: Progress) => void): Promise<() => void> {

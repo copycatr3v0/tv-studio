@@ -25,6 +25,7 @@ tvs-device.workspace = true
 tvs-kb.workspace = true
 tvs-recovery.workspace = true
 tvs-launcher.workspace = true
+tvs-deploy.workspace = true
 base64 = "0.22"
 
 [dev-dependencies]

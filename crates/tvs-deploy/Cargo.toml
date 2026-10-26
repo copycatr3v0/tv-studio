@@ -1,0 +1,20 @@
+[package]
+name = "tvs-deploy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tvs-core.workspace = true
+tvs-transport.workspace = true
+tvs-safety.workspace = true
+tvs-device.workspace = true
+tvs-recovery.workspace = true
+tvs-launcher.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+once_cell.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

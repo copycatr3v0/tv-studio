@@ -13,11 +13,13 @@ use tvs_transport::{find_adb, AdbExeTransport, DeviceEntry, DeviceState, MdnsSer
 
 mod debloat;
 mod launcher_cmds;
+mod deploy_cmds;
 
 pub struct AppState {
     pub(crate) store: Mutex<Store>,
     db_path: PathBuf,
     pub(crate) resource_dir: Option<PathBuf>,
+    pub(crate) cancel_deploy: std::sync::atomic::AtomicBool,
 }
 
 #[derive(Debug, Serialize)]
@@ -177,7 +179,7 @@ pub fn run() {
             let db_path = data_dir.join("studio.db");
             let store = Store::open(&db_path)?;
             let resource_dir = app.path().resource_dir().ok();
-            app.manage(AppState { store: Mutex::new(store), db_path, resource_dir });
+            app.manage(AppState { store: Mutex::new(store), db_path, resource_dir, cancel_deploy: std::sync::atomic::AtomicBool::new(false) });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -186,7 +188,10 @@ pub fn run() {
             debloat::apply_debloat, debloat::restore_preview, debloat::restore_apply, debloat::baseline_status,
             launcher_cmds::launcher_status, launcher_cmds::install_launcher, launcher_cmds::make_launcher_home,
             launcher_cmds::validate_theme, launcher_cmds::import_theme, launcher_cmds::deploy_theme, launcher_cmds::reset_theme,
-            launcher_cmds::save_theme_version, launcher_cmds::list_theme_versions, launcher_cmds::load_theme_version, launcher_cmds::launchable_apps
+            launcher_cmds::save_theme_version, launcher_cmds::list_theme_versions, launcher_cmds::load_theme_version, launcher_cmds::launchable_apps,
+            deploy_cmds::deploy_plan, deploy_cmds::deploy_run, deploy_cmds::deploy_cancel, deploy_cmds::deploy_interrupted,
+            deploy_cmds::deploy_resume, deploy_cmds::deploy_discard, deploy_cmds::deploy_history, deploy_cmds::undo_deployment,
+            deploy_cmds::save_deploy_profile, deploy_cmds::list_deploy_profiles, deploy_cmds::load_deploy_profile, deploy_cmds::import_deploy_profile
         ])
         .run(tauri::generate_context!())
         .expect("error while running Android TV Customizer Studio");

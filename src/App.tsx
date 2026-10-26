@@ -15,9 +15,12 @@ import { ThemesPage } from "./pages/ThemesPage";
 import { EditorPage } from "./pages/EditorPage";
 import { LauncherPage } from "./pages/LauncherPage";
 import { useThemeEditor } from "./theme/useThemeEditor";
+import { DeploymentPage } from "./pages/DeploymentPage";
+import { ProfilesPage } from "./pages/ProfilesPage";
+import { emptyProfile, type Profile } from "./lib/ipc";
 
 const GROUPS = ["Device", "Design", "Clean up", "Apply", "App"] as const;
-const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore", "themes", "editor", "launcher"]);
+const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore", "themes", "editor", "launcher", "deploy", "profiles"]);
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -25,6 +28,7 @@ export function App() {
   const [active, setActive] = useState<SectionId>("dashboard");
   const [serial, setSerial] = useState<string | null>(null);
   const editor = useThemeEditor();
+  const [profile, setProfile] = useState<Profile>(emptyProfile());
 
   useEffect(() => {
     api.getSettings().then(setSettings, (e: unknown) => setLoadErr(e instanceof IpcError ? e.message : String(e)));
@@ -93,11 +97,15 @@ export function App() {
           {current.id === "connect" && <ConnectPage onConnected={(s) => { setSerial(s); setActive("inspector"); }} />}
           {current.id === "inspector" && <InspectorPage serial={serial} onSelect={setSerial} />}
           {current.id === "apps" && <ApplicationsPage serial={serial} onSelect={setSerial} />}
-          {current.id === "debloat" && <DebloatPage serial={serial} onSelect={setSerial} />}
+          {current.id === "debloat" && <DebloatPage serial={serial} onSelect={setSerial}
+            onAddToPlan={(packages, confirmed) => { setProfile({ ...profile, debloat: { packages, confirmed } }); setActive("deploy"); }} />}
           {current.id === "restore" && <RestorePage serial={serial} onSelect={setSerial} />}
           {current.id === "themes" && <ThemesPage serial={serial} editor={editor} onEdit={() => setActive("editor")} />}
           {current.id === "editor" && <EditorPage serial={serial} editor={editor} advanced={mode === "advanced"} />}
           {current.id === "launcher" && <LauncherPage serial={serial} onSelect={setSerial} />}
+          {current.id === "deploy" && <DeploymentPage serial={serial} onSelect={setSerial} profile={profile} setProfile={setProfile} editor={editor}
+            advanced={mode === "advanced"} requireDryRun={settings?.default_dry_run ?? true} onOpenDebloat={() => setActive("debloat")} />}
+          {current.id === "profiles" && <ProfilesPage serial={serial} onSelect={setSerial} profile={profile} setProfile={setProfile} onOpenDeployment={() => setActive("deploy")} />}
           {!BUILT.has(current.id) && <Planned section={current} />}
         </div>
       </main>

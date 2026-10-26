@@ -61,6 +61,11 @@ const MIGRATIONS: &[&str] = &[
         detail TEXT
     );
     "#,
+    // v2: deployments remember their profile and the snapshot taken right before them.
+    r#"
+    ALTER TABLE deployments ADD COLUMN profile TEXT;
+    ALTER TABLE deployments ADD COLUMN snapshot_id INTEGER REFERENCES snapshots(id);
+    "#,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -185,6 +190,75 @@ impl Store {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct DeploymentRow {
+    pub id: i64,
+    pub fingerprint: String,
+    pub started: String,
+    pub finished: Option<String>,
+    pub status: String,
+    pub profile: Option<serde_json::Value>,
+    pub snapshot_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct JournalRow { pub step_id: String, pub phase: String, pub at: String, pub detail: Option<String> }
+
+type RawRow = (i64, String, String, Option<String>, String, Option<String>, Option<i64>);
+
+impl Store {
+    pub fn start_deployment(&self, fingerprint: &str, profile: &serde_json::Value, snapshot_id: Option<i64>) -> Result<i64> {
+        self.conn.execute("INSERT INTO deployments(fingerprint, profile, snapshot_id) VALUES(?1, ?2, ?3)",
+            params![fingerprint, profile.to_string(), snapshot_id])?;
+        Ok(self.conn.last_insert_rowid())
+    }
+    pub fn set_deployment_snapshot(&self, id: i64, snapshot_id: i64) -> Result<()> {
+        self.conn.execute("UPDATE deployments SET snapshot_id=?2 WHERE id=?1", params![id, snapshot_id])?;
+        Ok(())
+    }
+    pub fn journal(&self, deployment_id: i64, step_id: &str, phase: &str, detail: Option<&str>) -> Result<()> {
+        self.conn.execute("INSERT INTO journal(deployment_id, step_id, phase, detail) VALUES(?1,?2,?3,?4)",
+            params![deployment_id, step_id, phase, detail])?;
+        Ok(())
+    }
+    pub fn finish_deployment(&self, id: i64, status: &str) -> Result<()> {
+        self.conn.execute("UPDATE deployments SET status=?2, finished=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id=?1", params![id, status])?;
+        Ok(())
+    }
+    fn row(r: &rusqlite::Row) -> rusqlite::Result<RawRow> {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?))
+    }
+    fn to_row(t: RawRow) -> Result<DeploymentRow> {
+        Ok(DeploymentRow { id: t.0, fingerprint: t.1, started: t.2, finished: t.3, status: t.4,
+            profile: t.5.map(|p| serde_json::from_str(&p)).transpose()?, snapshot_id: t.6 })
+    }
+    const COLS: &'static str = "id, fingerprint, started, finished, status, profile, snapshot_id";
+    /// A deployment that never finished (app closed, crash, power cut) for this TV.
+    pub fn interrupted_deployment(&self, fingerprint: &str) -> Result<Option<DeploymentRow>> {
+        let t = self.conn.query_row(&format!("SELECT {} FROM deployments WHERE fingerprint=?1 AND status='running' ORDER BY id DESC LIMIT 1", Self::COLS),
+            params![fingerprint], Self::row).optional()?;
+        t.map(Self::to_row).transpose()
+    }
+    pub fn deployments(&self, fingerprint: &str, limit: u32) -> Result<Vec<DeploymentRow>> {
+        let mut st = self.conn.prepare(&format!("SELECT {} FROM deployments WHERE fingerprint=?1 ORDER BY id DESC LIMIT ?2", Self::COLS))?;
+        let rows = st.query_map(params![fingerprint, limit], Self::row)?.collect::<std::result::Result<Vec<_>, _>>()?;
+        rows.into_iter().map(Self::to_row).collect()
+    }
+    pub fn deployment(&self, id: i64) -> Result<Option<DeploymentRow>> {
+        let t = self.conn.query_row(&format!("SELECT {} FROM deployments WHERE id=?1", Self::COLS), params![id], Self::row).optional()?;
+        t.map(Self::to_row).transpose()
+    }
+    pub fn journal_rows(&self, deployment_id: i64) -> Result<Vec<JournalRow>> {
+        let mut st = self.conn.prepare("SELECT step_id, phase, at, detail FROM journal WHERE deployment_id=?1 ORDER BY id")?;
+        let rows = st.query_map(params![deployment_id], |r| Ok(JournalRow { step_id: r.get(0)?, phase: r.get(1)?, at: r.get(2)?, detail: r.get(3)? }))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+    pub fn snapshot(&self, id: i64) -> Result<Option<serde_json::Value>> {
+        let raw: Option<String> = self.conn.query_row("SELECT body FROM snapshots WHERE id=?1", params![id], |r| r.get(0)).optional()?;
+        Ok(raw.map(|s| serde_json::from_str(&s)).transpose()?)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct ProfileMeta { pub name: String, pub version: i64, pub created: String }
 
 impl Store {
@@ -274,6 +348,43 @@ mod tests {
     fn baseline_requires_known_device() {
         let s = Store::open_in_memory().unwrap();
         assert!(s.save_baseline_once("unknown", &json!({})).is_err());
+    }
+
+    #[test]
+    fn deployments_and_journal() {
+        let s = Store::open_in_memory().unwrap();
+        s.upsert_device("d", "x", None, None, None).unwrap();
+        let snap = s.save_snapshot("d", "pre_deploy", &json!({"home": "stock"})).unwrap();
+        let id = s.start_deployment("d", &json!({"name": "p"}), None).unwrap();
+        s.set_deployment_snapshot(id, snap).unwrap();
+        s.journal(id, "identify", "begin", None).unwrap();
+        s.journal(id, "identify", "done", Some("ok")).unwrap();
+        let r = s.interrupted_deployment("d").unwrap().unwrap();
+        assert_eq!(r.id, id);
+        assert_eq!(r.snapshot_id, Some(snap));
+        assert_eq!(r.profile, Some(json!({"name": "p"})));
+        assert_eq!(s.journal_rows(id).unwrap().len(), 2);
+        s.finish_deployment(id, "completed").unwrap();
+        assert!(s.interrupted_deployment("d").unwrap().is_none());
+        assert_eq!(s.deployments("d", 10).unwrap()[0].status, "completed");
+        assert_eq!(s.snapshot(snap).unwrap(), Some(json!({"home": "stock"})));
+    }
+
+    #[test]
+    fn v1_database_upgrades_in_place() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("studio.db");
+        {
+            let c = Connection::open(&p).unwrap();
+            c.execute_batch(MIGRATIONS[0]).unwrap();
+            c.pragma_update(None, "user_version", 1).unwrap();
+            c.execute("INSERT INTO devices(fingerprint, serial) VALUES('d','x')", []).unwrap();
+            c.execute("INSERT INTO deployments(fingerprint) VALUES('d')", []).unwrap();
+        }
+        let s = Store::open(&p).unwrap();
+        assert_eq!(s.schema_version().unwrap(), 2);
+        let r = s.interrupted_deployment("d").unwrap().unwrap();
+        assert_eq!(r.profile, None);
     }
 
     #[test]

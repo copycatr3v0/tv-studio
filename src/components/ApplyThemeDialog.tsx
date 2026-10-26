@@ -3,16 +3,7 @@ import { CheckCircle2, Circle, Loader2, X, XCircle } from "lucide-react";
 import { api, errMsg, type HomeCheck, type LauncherInfo, type ThemeReport } from "../lib/ipc";
 import type { Draft } from "../theme/useThemeEditor";
 import { Button, ErrorNote } from "./ui";
-
-async function toBase64(url: string): Promise<string> {
-  const blob = await (await fetch(url)).blob();
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(",", 2)[1] ?? "");
-    r.onerror = () => reject(new Error("Could not read the wallpaper"));
-    r.readAsDataURL(blob);
-  });
-}
+import { urlToBase64 as toBase64 } from "../lib/files";
 
 type StepState = "todo" | "busy" | "done" | "failed" | "skipped";
 const Icon = ({ s }: { s: StepState }) => s === "done" ? <CheckCircle2 size={16} className="text-accent-400" />

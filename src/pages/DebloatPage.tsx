@@ -14,7 +14,7 @@ const MODE_TEXT: Record<Mode, string> = {
 const SENSITIVE: KbCategory[] = ["streaming", "voice", "casting", "updater", "launcher"];
 const ORDER: KbCategory[] = ["telemetry", "ads_content", "retail_demo", "privacy", "preinstalled", "streaming", "voice", "casting", "updater", "launcher", "factory", "other"];
 
-export function DebloatPage({ serial, onSelect }: { serial: string | null; onSelect: (s: string) => void }) {
+export function DebloatPage({ serial, onSelect, onAddToPlan }: { serial: string | null; onSelect: (s: string) => void; onAddToPlan?: (packages: string[], confirmed: string[]) => void }) {
   const [inv, setInv] = useState<Inventory | null>(null);
   const [mode, setMode] = useState<Mode>("safe");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -159,6 +159,7 @@ export function DebloatPage({ serial, onSelect }: { serial: string | null; onSel
                   {busy === "eval" ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}Check on TV (dry run)
                 </Button>
                 <Button variant="primary" onClick={() => setAskApply(true)} disabled={!ready || busy !== null}>Disable {applySet.length || ""} selected</Button>
+                {onAddToPlan && <Button onClick={() => onAddToPlan(applySet, needConfirm)} disabled={!ready || busy !== null}>Add to deployment plan</Button>}
                 {!evalNow && selected.size > 0 && <span className="text-xs text-ink-400">Run the check first: it reads Home, inputs and Wi-Fi ownership from the TV.</span>}
                 {evalNow && needConfirm.some((n) => !confirmed.has(n)) && <span className="text-xs text-warn-400">Confirm the highlighted items to continue.</span>}
               </div>

@@ -35,7 +35,7 @@ export const SECTIONS: readonly Section[] = [
   { id: "privacy", label: "Privacy & Performance", icon: ShieldCheck, group: "Clean up", milestone: "M8", scope: ["android"], summary: "Evidence-graded telemetry audit, Private DNS and animation scales." },
   { id: "benchmarks", label: "Optimization Benchmarks", icon: Gauge, group: "Clean up", milestone: "M8", scope: ["android"], advancedOnly: true, summary: "Before/after key latency, jank, cold start, memory and idle CPU, with spread." },
   { id: "deploy", label: "Deployment", icon: Rocket, group: "Apply", milestone: "M7", scope: ["android", "launcher"], summary: "Dry-run plan, Apply Everything, live log and verified results." },
-  { id: "profiles", label: "Profiles", icon: HardDriveDownload, group: "Apply", milestone: "M7", scope: ["app"], summary: "Versioned deployment profiles: save, compare, import, export." },
+  { id: "profiles", label: "Profiles", icon: HardDriveDownload, group: "Apply", milestone: "M7", scope: ["app"], summary: "Saved deployment profiles (import, export) and this TV's deployment history with undo." },
   { id: "restore", label: "Restore", icon: History, group: "Apply", milestone: "M5", scope: ["android"], summary: "Exact rollback of packages, Home and animation settings to the TV's recorded baseline." },
   { id: "diagnostics", label: "Diagnostics", icon: Stethoscope, group: "App", milestone: "M8", scope: ["android"], advancedOnly: true, summary: "Firmware drift check, connection tests and exportable logs." },
   { id: "settings", label: "Settings", icon: Settings, group: "App", milestone: "M3", scope: ["app"], summary: "Mode, adb location, dry-run default and batch size." },

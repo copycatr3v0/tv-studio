@@ -51,5 +51,15 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [x] Apply-to-TV flow (install → Home → theme, each verified) and Launcher Builder page (8 UI tests)
 - [ ] Real-TV checks: preview vs. TV screenshot for 3 themes; theme push on Android 9 and on 12+
 
-## M7–M10
+## M7 Automation engine
+- [x] Versioned deployment profile (launcher, apps, animation speed, Private DNS, theme), unknown fields rejected
+- [x] Planner: reads the TV, previews every step (check / will change / already done / blocked), dependency order, verified batches; launchers never in app batches; Private DNS needs API 28; profile can be bound to one TV
+- [x] Runner: check-then-act steps, journal per step, dependents skipped on failure, critical failure stops; reconnect loop after a drop (re-runs the step once, finishing only what's left); stock launcher disabled only after Home re-confirmed, re-enabled at once if Home stops answering (14 tests)
+- [x] Snapshot before the first change (baseline once + pre-deploy per run); DB v2 stores each run's request and snapshot
+- [x] Resume an interrupted run from the TV's real state; discard; history; undo one deployment (incl. removing a launcher it installed, Home first)
+- [x] Original state and undo now include Private DNS settings
+- [x] Deployment page (dry run, Apply Everything, live progress, cancel, result, undo) and Profiles page (save/load/import/export, history) (6 UI tests)
+- [ ] Real-TV run of a full deployment and of a reboot mid-run
+
+## M8–M10
 See PLAN.md. Tasks get broken down when each milestone starts.

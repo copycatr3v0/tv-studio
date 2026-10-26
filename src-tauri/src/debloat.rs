@@ -131,7 +131,7 @@ fn load_baseline(app: &tauri::AppHandle, identity: &str) -> CmdResult<Snapshot> 
 }
 
 fn current_settings(t: &dyn tvs_transport::Transport, serial: &tvs_core::Serial) -> BTreeMap<String, Option<String>> {
-    tvs_recovery::ANIMATION_SETTINGS.iter().filter_map(|k| {
+    tvs_recovery::TRACKED_SETTINGS.iter().filter_map(|k| {
         let o = t.shell(serial, &tvs_transport::ShellCommand::new("settings").arg("get").arg("global").arg(k)).ok()?;
         let v = o.stdout.trim().to_string();
         Some((k.to_string(), if v == "null" || v.is_empty() { None } else { Some(v) }))

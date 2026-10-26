@@ -23,7 +23,7 @@ impl From<ThemeError> for CmdError {
 }
 
 /// The APK shipped inside the app (or `TVS_LAUNCHER_APK` for development builds).
-fn bundled_apk(app: &tauri::AppHandle) -> Option<PathBuf> {
+pub(crate) fn bundled_apk(app: &tauri::AppHandle) -> Option<PathBuf> {
     if let Some(p) = std::env::var_os("TVS_LAUNCHER_APK").map(PathBuf::from).filter(|p| p.is_file()) { return Some(p); }
     let dir = app.state::<AppState>().resource_dir.clone()?;
     [dir.join("resources").join("launcher").join("studio-home.apk"), dir.join("launcher").join("studio-home.apk")]
@@ -86,10 +86,10 @@ pub async fn launchable_apps(app: tauri::AppHandle, serial: String) -> CmdResult
     blocking(move || Ok(tvs_device::inventory::launchable_packages(&t, &serial)?)).await
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WallpaperIn { name: String, data_base64: String }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ThemeIn { config: serde_json::Value, #[serde(default)] wallpapers: Vec<WallpaperIn>, #[serde(default)] captions: Option<String> }
 
 #[derive(Debug, Serialize)]
@@ -110,7 +110,7 @@ pub fn import_theme(json_text: String) -> CmdResult<ImportResult> {
     Ok(ImportResult { config, issues })
 }
 
-fn bundle_from(input: ThemeIn) -> CmdResult<ThemeBundle> {
+pub(crate) fn bundle_from(input: ThemeIn) -> CmdResult<ThemeBundle> {
     if input.wallpapers.len() > MAX_WALLPAPERS { return Err(CmdError::Invalid("A theme can carry at most 30 wallpapers.".into())); }
     let mut wallpapers = vec![];
     let mut used = std::collections::BTreeSet::new();

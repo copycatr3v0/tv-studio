@@ -84,6 +84,12 @@ impl MockTransport {
     }
     pub fn device(&self, serial: &str) -> Option<MockDevice> { self.inner.lock().unwrap().devices.get(serial).cloned() }
     pub fn log(&self) -> Vec<String> { self.inner.lock().unwrap().log.clone() }
+    /// The TV disappears for good (powered off): it neither answers nor accepts `adb connect`.
+    pub fn unplug(&self, serial: &str) {
+        let mut g = self.inner.lock().unwrap();
+        g.devices.remove(serial);
+        g.reachable.remove(serial);
+    }
     /// Simulate a reboot / Wi-Fi drop: the device leaves the device list until reconnected.
     pub fn drop_device(&self, serial: &str) {
         let mut g = self.inner.lock().unwrap();

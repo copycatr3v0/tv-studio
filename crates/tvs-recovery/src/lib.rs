@@ -14,6 +14,12 @@ use tvs_transport::{ShellCommand, Transport, TransportError};
 
 pub const SNAPSHOT_VERSION: u32 = 1;
 pub const ANIMATION_SETTINGS: [&str; 3] = ["window_animation_scale", "transition_animation_scale", "animator_duration_scale"];
+/// Every global setting the app can change, recorded so undo can put each one back (or delete it when it
+/// was unset). A baseline recorded by an older version without some of these keys leaves them alone.
+pub const TRACKED_SETTINGS: [&str; 5] = [
+    "window_animation_scale", "transition_animation_scale", "animator_duration_scale",
+    "private_dns_mode", "private_dns_specifier",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -52,7 +58,7 @@ fn home_component(t: &dyn Transport, serial: &Serial) -> Option<String> {
 pub fn capture(t: &dyn Transport, serial: &Serial, identity: &str, now: &str) -> Result<Snapshot> {
     let pkgs = list_packages(t, serial)?;
     let mut settings = BTreeMap::new();
-    for key in ANIMATION_SETTINGS {
+    for key in TRACKED_SETTINGS {
         let o = t.shell(serial, &ShellCommand::new("settings").arg("get").arg("global").arg(key))?;
         let v = o.stdout.trim().to_string();
         settings.insert(key.to_string(), if v == "null" || v.is_empty() { None } else { Some(v) });

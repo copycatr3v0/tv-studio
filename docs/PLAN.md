@@ -22,8 +22,8 @@ kind of change must add its undo step to this same revert, with tests, before th
 | Milestone | Change it adds | Revert step it must add |
 |---|---|---|
 | M5 ✅ | Disabled packages, Home, animation scales | Re-enable recorded-enabled packages, set Home back, restore scales |
-| M6 | Studio launcher + theme files | Re-enable the stock launcher, set it as Home and **verify on screen**, *then* uninstall the Studio launcher and delete pushed theme files |
-| M7 | Privacy settings (Private DNS etc.), screensaver, display | Put each recorded setting back (`settings delete` when it was unset) |
+| M6 ✅ | Studio launcher + theme files | Re-enable the stock launcher, set it as Home and **verify on screen**, *then* uninstall the Studio launcher and delete pushed theme files |
+| M7 ✅ | Private DNS, animation speed | Each recorded setting put back (`settings delete` when it was unset) |
 | M8 | Drift repairs | Covered by the same baseline; repairs never overwrite it |
 
 Order rule: Home is handed back and verified before anything that could leave the TV without a launcher.
