@@ -24,7 +24,7 @@ pub enum Verdict {
 }
 
 static CORE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^(android|com\.android\.systemui|com\.android\.shell|com\.android\.phone|com\.android\.settings|com\.android\.tv\.settings|com\.(google\.)?android\.(permissioncontroller|packageinstaller|ext\.services|ext\.shared|modulemetadata)|com\.google\.android\.overlay\.modules.*|com\.android\.providers\..*)$").unwrap()
+    Regex::new(r"^(android|com\.android\.systemui|com\.android\.shell|com\.android\.phone|com\.android\.settings|com\.android\.tv\.settings|com\.(google\.)?android\.(permissioncontroller|packageinstaller|ext\.services|ext\.shared|modulemetadata)|com\.google\.android\.overlay\.modules.*|com\.android\.providers\..*|com\.(google\.)?android\.webview|com\.(google\.)?android\.networkstack.*|com\.(google\.)?android\.tethering|com\.(google\.)?android\.wifi\.(resources|dialog).*|com\.android\.(keychain|certinstaller|inputdevices|externalstorage|location\.fused))$").unwrap()
 });
 static CORE_OK: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^com\.android\.providers\.(calendar|contacts|userdictionary|blockednumber)$").unwrap()
@@ -104,6 +104,11 @@ mod tests {
             "com.google.android.modulemetadata", "com.google.android.overlay.modules.ext.services",
             "com.google.android.overlay.modules.permissioncontroller", "com.google.android.packageinstaller",
             "com.google.android.permissioncontroller",
+            // Security and connectivity components (final review).
+            "com.google.android.webview", "com.android.webview", "com.google.android.networkstack",
+            "com.android.networkstack.tethering", "com.google.android.networkstack.permissionconfig", "com.google.android.tethering",
+            "com.android.wifi.resources", "com.google.android.wifi.resources", "com.android.keychain", "com.android.certinstaller",
+            "com.android.inputdevices", "com.android.externalstorage", "com.android.location.fused",
         ] {
             assert!(is_core_package(&p(name)), "{name} should be core");
             assert!(matches!(can_disable(&p(name)), Verdict::Blocked(_)), "{name}");
@@ -117,7 +122,7 @@ mod tests {
             "com.android.providers.userdictionary", "com.android.providers.blockednumber",
             "com.android.phone.extra", "com.android.settings.intelligence", "com.android.shell2",
             "com.android.tv.settings.overlay", "com.example.android.ext.services", "com.example.ads",
-            "com.google.android.apps.tv.launcherx",
+            "com.google.android.apps.tv.launcherx", "com.tcl.android.webview", "com.mediatek.wwtv.webview",
         ] {
             assert!(!is_core_package(&p(name)), "{name} should not be core");
         }

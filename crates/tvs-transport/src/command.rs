@@ -11,7 +11,7 @@ pub enum CommandError {
 }
 
 /// Characters that would let a token chain, pipe, substitute or redirect in the TV's shell.
-const FORBIDDEN: &[char] = &[';', '&', '|', '`', '$', '>', '<', '\n', '\r', '(', ')', '\'', '"', '\\', '*', '?', '{', '}', '#', '~', '!'];
+const FORBIDDEN: &[char] = &[';', '&', '|', '`', '$', '>', '<', '\n', '\r', '(', ')', '\'', '"', '\\', '*', '?', '[', ']', '{', '}', '#', '~', '!'];
 
 /// Staged files this app writes on the TV live here and nowhere else.
 pub const STAGING_PREFIX: &str = "/data/local/tmp/tvs-";
@@ -54,7 +54,8 @@ impl ShellCommand {
 
     /// A dynamic token (settings key, path, value) checked against the forbidden set at runtime.
     pub fn checked(mut self, token: &str) -> Result<Self, CommandError> {
-        if token.is_empty() || !Self::safe(token) || token.contains(' ') {
+        // Any whitespace or control character (tab included) would split the token into extra arguments.
+        if token.is_empty() || !Self::safe(token) || token.chars().any(|c| c.is_whitespace() || c.is_control()) {
             return Err(CommandError::UnsafeToken(token.to_string()));
         }
         self.tokens.push(token.to_string());
@@ -71,7 +72,7 @@ impl ShellCommand {
 
     pub fn stdin(&self) -> Option<&str> { self.stdin.as_deref() }
 
-    fn safe(t: &str) -> bool { !t.chars().any(|c| FORBIDDEN.contains(&c)) }
+    fn safe(t: &str) -> bool { !t.chars().any(|c| FORBIDDEN.contains(&c) || c.is_control()) }
 
     pub fn tokens(&self) -> &[String] { &self.tokens }
 
@@ -126,6 +127,9 @@ mod tests {
     #[test]
     fn checked_rejects_injection() {
         for bad in ["a;b", "$(id)", "x|y", "a b", "", "a&&b", "`x`", "a>b"] {
+            assert!(ShellCommand::new("settings").checked(bad).is_err(), "{bad:?}");
+        }
+        for bad in ["a\tb", "a\u{0}b", "a\u{a0}b", "/sdcard/[ab]", "x\u{1b}[2J"] {
             assert!(ShellCommand::new("settings").checked(bad).is_err(), "{bad:?}");
         }
         assert!(ShellCommand::new("settings").checked("window_animation_scale").is_ok());

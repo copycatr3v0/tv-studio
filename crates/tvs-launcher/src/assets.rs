@@ -11,6 +11,8 @@ pub const MAX_W: u32 = 1920;
 pub const MAX_H: u32 = 1080;
 pub const MAX_INPUT_BYTES: usize = 30 * 1024 * 1024;
 pub const MAX_WALLPAPERS: usize = 30;
+/// Largest source image side accepted before resizing (8K).
+pub const MAX_SOURCE_SIDE: u32 = 8192;
 
 static NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[A-Za-z0-9_-]{1,60}\.jpg$").unwrap());
 
@@ -43,7 +45,14 @@ pub fn normalize(label: &str, bytes: &[u8]) -> Result<Vec<u8>, AssetError> {
     if bytes.len() > MAX_INPUT_BYTES { return Err(AssetError::TooLarge(label.into())); }
     let fmt = image::guess_format(bytes).map_err(|_| AssetError::Unreadable(label.into()))?;
     if !matches!(fmt, ImageFormat::Jpeg | ImageFormat::Png | ImageFormat::WebP) { return Err(AssetError::Unreadable(label.into())); }
-    let img = image::load_from_memory_with_format(bytes, fmt).map_err(|_| AssetError::Unreadable(label.into()))?;
+    // Bounded decode: a small file can claim enormous dimensions (decompression bomb).
+    let mut reader = image::ImageReader::with_format(Cursor::new(bytes), fmt);
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_SOURCE_SIDE);
+    limits.max_image_height = Some(MAX_SOURCE_SIDE);
+    limits.max_alloc = Some(256 * 1024 * 1024);
+    reader.limits(limits);
+    let img = reader.decode().map_err(|_| AssetError::Unreadable(label.into()))?;
     let (w, h) = img.dimensions();
     let img = if w > MAX_W || h > MAX_H { img.resize(MAX_W, MAX_H, FilterType::Lanczos3) } else { img };
     let rgb = img.to_rgb8();
@@ -78,6 +87,26 @@ mod tests {
         let out = normalize("small.png", &b).unwrap();
         assert_eq!(image::load_from_memory(&out).unwrap().dimensions(), (800, 450));
         assert!(!out.windows(5).any(|w| w == b"<?php"));
+    }
+
+    #[test]
+    fn refuses_images_claiming_huge_dimensions() {
+        // A valid PNG header announcing 60000×60000 pixels, without the pixel data.
+        let mut png = Vec::new();
+        use image::ImageEncoder;
+        image::codecs::png::PngEncoder::new(&mut png).write_image(&[0u8; 3], 1, 1, image::ExtendedColorType::Rgb8).unwrap();
+        // IHDR width/height live at bytes 16..24; patch them and fix the CRC.
+        png[16..20].copy_from_slice(&60_000u32.to_be_bytes());
+        png[20..24].copy_from_slice(&60_000u32.to_be_bytes());
+        let crc = crc32(&png[12..29]);
+        png[29..33].copy_from_slice(&crc.to_be_bytes());
+        assert!(matches!(normalize("bomb.png", &png), Err(AssetError::Unreadable(_))));
+    }
+
+    fn crc32(data: &[u8]) -> u32 {
+        let mut c = 0xFFFF_FFFFu32;
+        for &b in data { c ^= b as u32; for _ in 0..8 { c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 }; } }
+        !c
     }
 
     #[test]

@@ -78,5 +78,10 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [ ] Real-TV pass: the checklist in TESTING.md, on at least one Google TV and one Android TV
 - [ ] Automated UI run of the desktop app in demo mode (tauri-driver, Windows only)
 
-## M10
-See PLAN.md.
+## M10 Release + final review
+- [x] adb: not bundled (Google SDK licence §3.4); Dashboard "Get adb from Google" downloads the official zip on request, with host allow-list, size caps, fixed-name extraction and a Windows signature check (3 tests + UI test)
+- [x] Final security review: 8 findings fixed (docs/SECURITY.md)
+- [x] CI: clippy on Windows; tag `v*` → draft GitHub release with checksums
+- [x] SECURITY.md, TESTING.md, README final
+- [ ] Code-signing certificate for the installer (optional; SmartScreen warns without it)
+- [ ] Real-TV validation (TESTING.md checklist): the only thing standing between this and a public release

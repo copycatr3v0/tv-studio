@@ -33,3 +33,10 @@ The Outfit typeface in launcher/app/src/main/res/font/outfit.ttf is copyright
 The Outfit Project Authors and licensed under the SIL Open Font License 1.1,
 see launcher/FONT-LICENSE-OFL.txt.
 ```
+
+
+## Android SDK Platform-Tools (adb)
+
+Not distributed with this app. When the user asks, the app downloads Google's official platform-tools zip
+from dl.google.com; the user accepts Google's terms (https://developer.android.com/studio/releases/platform-tools)
+at that point. Google's NOTICE.txt from the zip is kept next to the extracted files.

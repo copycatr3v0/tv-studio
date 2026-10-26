@@ -15,15 +15,35 @@ mod debloat;
 mod launcher_cmds;
 mod deploy_cmds;
 mod insight_cmds;
+mod adb_setup;
 
 pub struct AppState {
     pub(crate) store: Mutex<Store>,
     db_path: PathBuf,
+    pub(crate) data_dir: PathBuf,
     pub(crate) resource_dir: Option<PathBuf>,
     pub(crate) cancel_deploy: std::sync::atomic::AtomicBool,
     /// The simulated TV world, created the first time demo mode is used and kept for the whole session
     /// so changes persist between screens (and Revert to original has something to undo).
     demo: OnceLock<Arc<tvs_transport::mock::MockTransport>>,
+    /// What is changing a TV right now. One change at a time, so Revert can't interleave with Apply Everything.
+    busy: Arc<Mutex<Option<&'static str>>>,
+}
+
+/// Held for the whole of a command that changes a TV; released on drop (also on error or panic).
+pub(crate) struct BusyGuard(Arc<Mutex<Option<&'static str>>>);
+impl Drop for BusyGuard {
+    fn drop(&mut self) { if let Ok(mut b) = self.0.lock() { *b = None; } }
+}
+
+/// Start a change, or refuse with what is already running. Read-only commands don't take this.
+pub(crate) fn begin_change(state: &AppState, what: &'static str) -> CmdResult<BusyGuard> {
+    let mut b = state.busy.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(running) = *b {
+        return Err(CmdError::Invalid(format!("{running} is still running. Wait for it to finish (or cancel it), then try again; nothing was changed.")));
+    }
+    *b = Some(what);
+    Ok(BusyGuard(state.busy.clone()))
 }
 
 /// Whatever the commands talk to: adb.exe, or the simulated TV in demo mode.
@@ -58,6 +78,7 @@ fn resolve_adb(state: &AppState, settings: &AppSettings) -> Option<(PathBuf, &'s
     }
     let bundled = state.resource_dir.as_deref().and_then(|d| find_adb(Some(d)).filter(|p| p.starts_with(d)));
     if let Some(p) = bundled { return Some((p, "bundled")); }
+    if let Some(p) = adb_setup::downloaded_adb(&state.data_dir) { return Some((p, "downloaded")); }
     find_adb(None).map(|p| (p, "system"))
 }
 
@@ -208,7 +229,7 @@ pub fn run() {
             let db_path = data_dir.join("studio.db");
             let store = Store::open(&db_path)?;
             let resource_dir = app.path().resource_dir().ok();
-            app.manage(AppState { store: Mutex::new(store), db_path, resource_dir, cancel_deploy: std::sync::atomic::AtomicBool::new(false), demo: OnceLock::new() });
+            app.manage(AppState { store: Mutex::new(store), db_path, data_dir, resource_dir, cancel_deploy: std::sync::atomic::AtomicBool::new(false), demo: OnceLock::new(), busy: Arc::new(Mutex::new(None)) });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -222,8 +243,40 @@ pub fn run() {
             deploy_cmds::deploy_resume, deploy_cmds::deploy_discard, deploy_cmds::deploy_history, deploy_cmds::undo_deployment,
             deploy_cmds::save_deploy_profile, deploy_cmds::list_deploy_profiles, deploy_cmds::load_deploy_profile, deploy_cmds::import_deploy_profile,
             insight_cmds::bench_run, insight_cmds::bench_list, insight_cmds::bench_compare, insight_cmds::privacy_audit,
-            insight_cmds::drift_check, insight_cmds::diagnostics_bundle
+            insight_cmds::drift_check, insight_cmds::diagnostics_bundle, adb_setup::install_adb, adb_setup::open_platform_tools_terms
         ])
         .run(tauri::generate_context!())
         .expect("error while running Android TV Customizer Studio");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state() -> AppState {
+        AppState { store: Mutex::new(Store::open_in_memory().unwrap()), db_path: PathBuf::new(), data_dir: PathBuf::new(), resource_dir: None,
+            cancel_deploy: std::sync::atomic::AtomicBool::new(false), demo: OnceLock::new(), busy: Arc::new(Mutex::new(None)) }
+    }
+
+    #[test]
+    fn one_change_at_a_time() {
+        let st = state();
+        let g = begin_change(&st, "Apply Everything").unwrap();
+        let err = begin_change(&st, "Restore").err().unwrap();
+        assert!(matches!(&err, CmdError::Invalid(m) if m.starts_with("Apply Everything is still running")));
+        drop(g);
+        assert!(begin_change(&st, "Restore").is_ok(), "released when the first change ends");
+    }
+
+    #[test]
+    fn demo_mode_uses_one_persistent_simulated_tv() {
+        let st = state();
+        st.store.lock().unwrap().save_settings(&AppSettings { demo_mode: true, ..Default::default() }).unwrap();
+        let t1 = transport(&st).unwrap();
+        t1.connect(&Serial::new(tvs_demo::DEMO_SERIAL).unwrap()).unwrap();
+        let t2 = transport(&st).unwrap();
+        assert_eq!(t2.devices().unwrap().len(), 1, "the connection survives between commands");
+        assert_eq!(demo_port_state(&Endpoint::parse("192.168.1.50", DEFAULT_PORT).unwrap()), PortState::Open);
+        assert_eq!(demo_port_state(&Endpoint::parse("192.168.1.99", DEFAULT_PORT).unwrap()), PortState::Timeout);
+    }
 }

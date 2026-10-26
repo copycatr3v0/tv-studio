@@ -44,3 +44,23 @@ describe("demo mode", () => {
     expect(screen.queryByText(/Demo mode:/)).not.toBeInTheDocument();
   });
 });
+
+describe("adb setup", () => {
+  it("offers Google's download only when adb is missing, and shows the result", async () => {
+    let installed = false;
+    invoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return { ...settings, demo_mode: false };
+      if (cmd === "app_info") return { version: "0.1.0", db_path: "x", schema_version: 3, adb: installed ? { path: "C:\\\\Users\\\\r\\\\AppData\\\\platform-tools\\\\adb.exe", version: "Android Debug Bridge version 1.0.41", source: "downloaded" } : null };
+      if (cmd === "list_devices") return [];
+      if (cmd === "install_adb") { installed = true; return { path: "adb.exe", version: "1.0.41", signature: "Valid|CN=Google LLC" }; }
+      throw new Error(`unexpected ${cmd}`);
+    });
+    render(<App />);
+    const btn = await screen.findByRole("button", { name: /get adb from google/i });
+    expect(screen.getByRole("link", { name: /platform-tools terms/i })).toHaveAttribute("href", expect.stringContaining("developer.android.com"));
+    expect(invoke).not.toHaveBeenCalledWith("install_adb", undefined);
+    fireEvent.click(btn);
+    expect(await screen.findByText(/\(downloaded\)/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /get adb from google/i })).not.toBeInTheDocument();
+  });
+});

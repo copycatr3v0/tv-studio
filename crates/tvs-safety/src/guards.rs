@@ -50,6 +50,7 @@ const ESSENTIAL_PATTERNS: &[(&str, &str)] = &[
     ("remotecontrol", "Remote control service: remote buttons may stop working."),
     ("tvinput", "TV input service: HDMI, AV or tuner inputs may stop working."),
     ("bluetooth", "Bluetooth-related service: remotes or audio devices may be affected."),
+    ("webview", "A WebView: only safe when it isn't the TV's active WebView provider (Settings and many apps render with it)."),
 ];
 
 fn add(out: &mut BTreeMap<PackageName, Verdict>, p: &PackageName, v: Verdict) {

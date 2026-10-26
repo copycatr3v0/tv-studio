@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { api, IpcError, type AppInfo, type DeviceEntry } from "../lib/ipc";
+import { api, IpcError, PLATFORM_TOOLS_TERMS, type AppInfo, type DeviceEntry } from "../lib/ipc";
 import { Button, ErrorNote, Panel, Row } from "../components/ui";
 
 const STATE_TEXT: Record<DeviceEntry["state"], { label: string; tone: string }> = {
@@ -30,6 +30,15 @@ export function Dashboard() {
       setBusy(false);
     }
   }, []);
+
+  const [installing, setInstalling] = useState(false);
+  const [installErr, setInstallErr] = useState<string | null>(null);
+  async function getAdb() {
+    setInstalling(true); setInstallErr(null);
+    try { await api.installAdb(); setInfo(await api.appInfo()); void refresh(); }
+    catch (e) { setInstallErr(e instanceof IpcError ? e.message : String(e)); }
+    finally { setInstalling(false); }
+  }
 
   useEffect(() => {
     api.appInfo().then(setInfo, (e: unknown) => setInfoErr(e instanceof IpcError ? e.message : String(e)));
@@ -73,6 +82,18 @@ export function Dashboard() {
             <Row label="Database"><span className="font-mono text-xs break-all">{info.db_path}</span></Row>
             <Row label="Schema version">{info.schema_version}</Row>
           </dl>
+        )}
+        {info && !info.adb && (
+          <div className="mt-4 rounded-lg border border-ink-600 p-4 text-sm">
+            <p className="font-medium">adb isn&rsquo;t set up yet</p>
+            <p className="mt-1 text-ink-400">
+              The app talks to your TV through adb, Google&rsquo;s Android Debug Bridge. Google&rsquo;s licence doesn&rsquo;t let other apps ship it,
+              so the app downloads the official copy from Google (about 7 MB) when you ask. By downloading it you accept
+              Google&rsquo;s <a href={PLATFORM_TOOLS_TERMS} onClick={(e) => { e.preventDefault(); api.openPlatformToolsTerms().catch((x: unknown) => setInstallErr(x instanceof IpcError ? x.message : String(x))); }} className="text-accent-400 underline">platform-tools terms</a>.
+            </p>
+            {installErr && <div className="mt-3"><ErrorNote message={installErr} /></div>}
+            <div className="mt-3"><Button variant="primary" onClick={() => void getAdb()} disabled={installing}>{installing ? "Downloading from Google\u2026" : "Get adb from Google"}</Button></div>
+          </div>
         )}
       </Panel>
     </div>

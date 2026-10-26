@@ -321,6 +321,8 @@ impl Transport for MockTransport {
     }
 
     fn push(&self, serial: &Serial, local: &Path, remote: &str) -> Result<()> {
+        // Same rule as the real transport, so a test fails if code ever pushes outside the staging area.
+        if !crate::is_staging_path(remote) { return Err(TransportError::Io(format!("refusing to push outside the staging area: {remote}"))); }
         let data = std::fs::read(local).map_err(|e| TransportError::Io(e.to_string()))?;
         let mut g = self.inner.lock().unwrap();
         let dev = g.devices.get_mut(serial.as_str()).ok_or_else(|| TransportError::NoDevice(serial.to_string()))?;

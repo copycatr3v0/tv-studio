@@ -30,6 +30,7 @@ pub struct BenchSaved { id: i64, run: BenchRun }
 /// Measure the launcher that currently answers Home. Changes nothing on the TV except which app is in front.
 #[tauri::command]
 pub async fn bench_run(app: tauri::AppHandle, serial: String, label: String, quick: bool) -> CmdResult<BenchSaved> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "A benchmark")?;
     let serial = serial_arg(&serial)?;
     let label = label.trim().chars().take(40).collect::<String>();
     if label.is_empty() { return Err(CmdError::Invalid("Give the run a label, e.g. “before”.".into())); }
@@ -151,10 +152,15 @@ pub async fn diagnostics_bundle(app: tauri::AppHandle, serial: Option<String>) -
     Ok(out)
 }
 
-/// Replace the serial and anything that looks like an IPv4 address.
+/// Replace the serial and anything that looks like an IPv4/IPv6 or MAC address.
 pub(crate) fn redact(text: &str, serial: &str) -> String {
-    let re = regex::Regex::new(r"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b").unwrap();
-    re.replace_all(&text.replace(serial, "<tv>"), "<ip>").into_owned()
+    let mac = regex::Regex::new(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b").unwrap();
+    let v6 = regex::Regex::new(r"\b(?:[0-9A-Fa-f]{1,4}:){2,7}(?::|[0-9A-Fa-f]{1,4})\b|\b(?:[0-9A-Fa-f]{1,4}:)+:(?:[0-9A-Fa-f]{1,4}:?)*").unwrap();
+    let v4 = regex::Regex::new(r"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b").unwrap();
+    let t = text.replace(serial, "<tv>");
+    let t = mac.replace_all(&t, "<mac>");
+    let t = v6.replace_all(&t, "<ip>");
+    v4.replace_all(&t, "<ip>").into_owned()
 }
 
 #[cfg(test)]
@@ -164,5 +170,8 @@ mod tests {
         let r = super::redact(r#"{"a":"192.168.1.50:5555","b":"adb-ABC._adb-tls-connect._tcp","c":"10.0.0.2","v":"Android 12"}"#, "adb-ABC._adb-tls-connect._tcp");
         assert!(!r.contains("192.168") && !r.contains("10.0.0.2") && !r.contains("adb-ABC"));
         assert!(r.contains("Android 12"));
+        let r = super::redact("wlan a4:5e:60:12:34:56 fe80::1c2a:3bff:fe4d:5e6f 2001:db8:0:0:1:0:0:1 at 2026-10-26T12:00:00Z", "x:5555");
+        assert!(!r.contains("a4:5e") && !r.contains("fe80") && !r.contains("2001:db8"), "{r}");
+        assert!(r.contains("2026-10-26T12:00:00Z"), "timestamps survive: {r}");
     }
 }

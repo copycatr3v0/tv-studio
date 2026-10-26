@@ -21,8 +21,11 @@ export type AppSettings = z.infer<typeof AppSettings>;
 export const AdbInfo = z.object({
   path: z.string(),
   version: z.string().nullable(),
-  source: z.enum(["bundled", "system", "custom", "demo"]),
+  source: z.enum(["bundled", "downloaded", "system", "custom", "demo"]),
 });
+
+export const AdbSetup = z.object({ path: z.string(), version: z.string().nullable(), signature: z.string() });
+export const PLATFORM_TOOLS_TERMS = "https://developer.android.com/studio/releases/platform-tools";
 
 export const AppInfo = z.object({
   version: z.string(),
@@ -233,7 +236,7 @@ export class IpcError extends Error {
 }
 
 const TRANSPORT_MESSAGES: Record<string, string> = {
-  adb_missing: "adb was not found. Reinstall the app, or set a custom adb path in Settings.",
+  adb_missing: "adb is not set up yet. On the Dashboard, click \u201cGet adb from Google\u201d, or set a custom adb path in Settings.",
   unauthorized: "The TV has not authorized this computer yet. Accept the “Allow USB debugging?” prompt on the TV.",
   timeout: "The TV did not answer in time.",
   pairing_failed: "Pairing failed. The code and pairing port change each time the pairing screen opens: check both on the TV and try again.",
@@ -267,6 +270,8 @@ async function call<T>(cmd: string, schema: z.ZodType<T>, args?: Record<string, 
 
 export const api = {
   appInfo: () => call("app_info", AppInfo),
+  installAdb: () => call("install_adb", AdbSetup),
+  openPlatformToolsTerms: () => call("open_platform_tools_terms", z.null()),
   getSettings: () => call("get_settings", AppSettings),
   saveSettings: (settings: AppSettings) => call("save_settings", AppSettings, { settings }),
   listDevices: () => call("list_devices", z.array(DeviceEntry)),

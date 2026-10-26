@@ -81,6 +81,7 @@ pub struct ApplyResult { report: ChangeReport, baseline_created: bool, identity:
 /// and a pre-change snapshot, then disables in verified batches.
 #[tauri::command]
 pub async fn apply_debloat(app: tauri::AppHandle, request: ApplyRequest) -> CmdResult<ApplyResult> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Disabling apps")?;
     let serial = serial_arg(&request.serial)?;
     let sel = names(&request.packages)?;
     if sel.is_empty() { return Err(CmdError::Invalid("Nothing selected.".into())); }
@@ -176,6 +177,7 @@ pub async fn restore_preview(app: tauri::AppHandle, serial: String, scope: Optio
 
 #[tauri::command]
 pub async fn restore_apply(app: tauri::AppHandle, serial: String, scope: Option<Vec<String>>) -> CmdResult<ChangeReport> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Restore")?;
     let serial = serial_arg(&serial)?;
     let t = transport(&app.state::<AppState>())?;
     let batch = app.state::<AppState>().store.lock().unwrap().settings()?.batch_size as usize;

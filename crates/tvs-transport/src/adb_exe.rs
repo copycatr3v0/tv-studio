@@ -46,6 +46,9 @@ impl AdbExeTransport {
         Ok(out.stdout.lines().next().unwrap_or_default().to_string())
     }
 
+    /// Stop the adb server started from this adb.exe (needed before replacing the file on Windows).
+    pub fn kill_server(&self) -> Result<()> { self.run(&["kill-server"], Duration::from_secs(10)).map(|_| ()) }
+
     fn run(&self, args: &[&str], timeout: Duration) -> Result<ShellOutput> {
         let start = Instant::now();
         let mut cmd = Command::new(&self.adb);
@@ -121,6 +124,8 @@ impl Transport for AdbExeTransport {
     }
 
     fn push(&self, serial: &Serial, local: &Path, remote: &str) -> Result<()> {
+        // The app only ever writes its own staging files on the TV; anything else is a bug, refused here too.
+        if !crate::is_staging_path(remote) { return Err(TransportError::Io(format!("refusing to push outside the staging area: {remote}"))); }
         let local = local.to_str().ok_or_else(|| TransportError::Io("non-UTF-8 path".into()))?;
         Self::check(self.run(&["-s", serial.as_str(), "push", local, remote], Duration::from_secs(300))?).map(|_| ())
     }

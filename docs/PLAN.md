@@ -38,6 +38,6 @@ Order rule: Home is handed back and verified before anything that could leave th
 | Factory package started | Low | Critical | Never-start list; inventory is read-only |
 | OEM blocks APK install / HOME | Med | Med | Detect early, offer Mode A only |
 | Key helper breaks volume repeat | Med | Low | Off by default; explicit trade-off text |
-| adb.exe redistribution terms | Low | Med | Review before M10; fall back to a first-run download from Google or a pure-Rust transport |
+| adb.exe redistribution terms | Resolved | — | Google's SDK licence (§3.4) bars redistribution, so adb is not bundled: the app downloads Google's official zip on request (Dashboard → "Get adb from Google") |
 | Wallpaper/font licence contamination | Med | Med | Original assets only; OFL fonts with licence files |
 | OneDrive sync of build dirs | — | — | Repo moved to C:\dev ✅ |

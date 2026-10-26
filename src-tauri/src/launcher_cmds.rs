@@ -59,6 +59,7 @@ pub async fn launcher_status(app: tauri::AppHandle, serial: String) -> CmdResult
 
 #[tauri::command]
 pub async fn install_launcher(app: tauri::AppHandle, serial: String) -> CmdResult<LauncherStatus> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Launcher install")?;
     let serial = serial_arg(&serial)?;
     let t = transport(&app.state::<AppState>())?;
     let apk = bundled_apk(&app).ok_or_else(|| CmdError::Invalid("This build of the app does not include the launcher APK. Build it from launcher/ (see launcher/NOTICE.md) or use an official release.".into()))?;
@@ -74,6 +75,7 @@ pub async fn install_launcher(app: tauri::AppHandle, serial: String) -> CmdResul
 /// Make the Studio launcher Home and confirm it on screen. The stock launcher stays enabled.
 #[tauri::command]
 pub async fn make_launcher_home(app: tauri::AppHandle, serial: String) -> CmdResult<HomeCheck> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Making the launcher Home")?;
     let serial = serial_arg(&serial)?;
     let t = transport(&app.state::<AppState>())?;
     let app2 = app.clone();
@@ -134,6 +136,7 @@ pub(crate) fn bundle_from(input: ThemeIn) -> CmdResult<ThemeBundle> {
 
 #[tauri::command]
 pub async fn deploy_theme(app: tauri::AppHandle, serial: String, theme: ThemeIn) -> CmdResult<ThemeReport> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Sending the theme")?;
     let serial = serial_arg(&serial)?;
     let bundle = bundle_from(theme)?;
     let issues = schema::validate(&bundle.config);
@@ -149,6 +152,7 @@ pub async fn deploy_theme(app: tauri::AppHandle, serial: String, theme: ThemeIn)
 
 #[tauri::command]
 pub async fn reset_theme(app: tauri::AppHandle, serial: String) -> CmdResult<ThemeReport> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Theme reset")?;
     let serial = serial_arg(&serial)?;
     let t = transport(&app.state::<AppState>())?;
     blocking(move || Ok(theme::reset(&t, &serial, &revision())?)).await

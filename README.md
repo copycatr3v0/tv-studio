@@ -5,7 +5,10 @@ reversible debloating, a visual theme studio, an optional lightweight launcher, 
 with verification, and exact rollback. No app needs to be installed on the TV unless you choose the
 custom launcher.
 
-Status: **M9 (simulated half)** done: 145 core tests, 39 UI tests and 13 end-to-end scenarios on a simulated TCL Google TV. Real-TV validation is pending: see [docs/TESTING.md](docs/TESTING.md). See [docs/PLAN.md](docs/PLAN.md) and [docs/TASKS.md](docs/TASKS.md).
+Status: **feature-complete, simulator-tested.** All 10 milestones are done except real-TV validation:
+151 core tests, 40 UI tests and 13 end-to-end scenarios pass on a simulated TCL Google TV, but nothing has been
+confirmed on real hardware yet. See [docs/TESTING.md](docs/TESTING.md) for the real-TV checklist and
+[docs/SECURITY.md](docs/SECURITY.md) for the safety rules and the final review. See [docs/PLAN.md](docs/PLAN.md) and [docs/TASKS.md](docs/TASKS.md).
 
 ## Layout
 
@@ -27,7 +30,7 @@ Status: **M9 (simulated half)** done: 145 core tests, 39 UI tests and 13 end-to-
 | `crates/tvs-insight` | Home-screen benchmark with cautious before/after verdicts, evidence-graded privacy audit |
 | `crates/tvs-demo` | Simulated TCL Google TV for demo mode and the end-to-end tests |
 | `crates/tvs-store` | SQLite: settings, devices, write-once baselines, versioned profiles, journal |
-| `docs/` | Research, spec, architecture, capability matrix, plan |
+| `docs/` | Research, spec, architecture, capability matrix, plan, tasks, recovery, benchmarks, testing, security |
 
 ## Develop (Windows)
 
@@ -58,8 +61,16 @@ copy app\build\outputs\apk\release\app-release.apk ..\src-tauri\resources\launch
 ```
 Official builds get it from CI automatically. Without it the app still works; the launcher features say it isn't bundled.
 
-Until adb is bundled, the app uses `adb.exe` from your Android SDK (`%LOCALAPPDATA%\Android\Sdk\platform-tools`),
-from `PATH`, or from the path set in Settings.
+adb is not bundled: Google's SDK licence doesn't allow other apps to ship it. On first run the Dashboard offers
+"Get adb from Google", which downloads Google's official platform-tools zip over HTTPS and keeps only `adb.exe` and
+its two DLLs (per user, under `%APPDATA%\studio.tvcustomizer.desktop\platform-tools`). The app also finds an adb
+from Android Studio (`%LOCALAPPDATA%\Android\Sdk\platform-tools`), from `PATH`, or from a path set in Settings.
+
+## Release
+
+Push a tag (`git tag v0.1.0; git push origin v0.1.0`). CI runs every test, builds the launcher APK and the Windows
+installer, and creates a **draft** GitHub release with `SHA256SUMS.txt`. Review it, then publish it on GitHub.
+The installer is unsigned until a code-signing certificate is added (SmartScreen will warn).
 
 ## Credits
 

@@ -83,6 +83,7 @@ fn run_request(app: tauri::AppHandle, serial: tvs_core::Serial, req: DeployReque
 /// Apply Everything. Re-plans on the TV first, so the run always starts from the TV's real state.
 #[tauri::command]
 pub async fn deploy_run(app: tauri::AppHandle, serial: String, request: DeployRequest) -> CmdResult<RunResult> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Apply Everything")?;
     let serial = serial_arg(&serial)?;
     blocking(move || run_request(app, serial, request)).await
 }
@@ -115,6 +116,7 @@ pub async fn deploy_interrupted(app: tauri::AppHandle, serial: String) -> CmdRes
 /// Resume = plan the same request again against the TV's real state; finished steps show as already done.
 #[tauri::command]
 pub async fn deploy_resume(app: tauri::AppHandle, serial: String, deployment_id: i64) -> CmdResult<RunResult> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Apply Everything")?;
     let serial = serial_arg(&serial)?;
     let row = app.state::<AppState>().store.lock().unwrap().deployment(deployment_id)?
         .ok_or_else(|| CmdError::Invalid("That deployment no longer exists.".into()))?;
@@ -147,6 +149,7 @@ pub async fn deploy_history(app: tauri::AppHandle, serial: String) -> CmdResult<
 /// Put the TV back to how it was right before one deployment (its pre-change snapshot).
 #[tauri::command]
 pub async fn undo_deployment(app: tauri::AppHandle, serial: String, deployment_id: i64) -> CmdResult<ChangeReport> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "Undo")?;
     let serial = serial_arg(&serial)?;
     let (snap_id, owner) = {
         let st = app.state::<AppState>();
