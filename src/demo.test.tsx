@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (cmd: string, args?: unknown) => invoke(cmd, args) }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
 
 import { App } from "./App";
 

@@ -6,19 +6,19 @@ import { Planned } from "./pages/Planned";
 import { App } from "./App";
 
 describe("navigation", () => {
-  it("has the 15 sections from the spec, in order, with unique ids", () => {
+  it("has the 15 sections from the spec plus the guide, in order, with unique ids", () => {
     expect(SECTIONS.map((s) => s.label)).toEqual([
-      "Dashboard", "Connect TV", "Device Inspector", "Themes", "Live Theme Editor", "Launcher Builder",
+      "Guided setup", "Dashboard", "Connect TV", "Device Inspector", "Themes", "Live Theme Editor", "Launcher Builder",
       "Applications", "Debloat Center", "Privacy & Performance", "Optimization Benchmarks", "Deployment",
       "Profiles", "Restore", "Diagnostics", "Settings",
     ]);
-    expect(new Set(SECTIONS.map((s) => s.id)).size).toBe(15);
+    expect(new Set(SECTIONS.map((s) => s.id)).size).toBe(16);
   });
 
   it("beginner mode hides only advanced sections", () => {
     const hidden = SECTIONS.filter((s) => !visibleSections("beginner").includes(s)).map((s) => s.id);
     expect(hidden).toEqual(["launcher", "benchmarks", "diagnostics"]);
-    expect(visibleSections("advanced")).toHaveLength(15);
+    expect(visibleSections("advanced")).toHaveLength(16);
   });
 
   it("every section declares where its changes land", () => {

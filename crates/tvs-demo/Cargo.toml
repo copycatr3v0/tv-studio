@@ -11,6 +11,7 @@ tvs-transport.workspace = true
 
 [dev-dependencies]
 tvs-safety.workspace = true
+tvs-kb.workspace = true
 tvs-device.workspace = true
 tvs-recovery.workspace = true
 tvs-launcher.workspace = true

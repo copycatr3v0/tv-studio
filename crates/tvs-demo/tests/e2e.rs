@@ -311,3 +311,38 @@ fn the_demo_world_connects_and_pairs() {
     m.connect(&s()).unwrap();
     assert_eq!(m.devices().unwrap().len(), 2);
 }
+
+/// What the Guided setup does: evidence-based preselection, then the TV's live checks, then plan and run.
+fn guided_selection(m: &MockTransport, mode: tvs_kb::Mode) -> Vec<String> {
+    use tvs_safety::Verdict;
+    let installed = tvs_device::inventory::list_packages(m, &s()).unwrap();
+    let wanted: Vec<PackageName> = installed.iter()
+        .filter(|p| p.enabled && !matches!(PackageName::new(p.name.clone()).map(|n| tvs_safety::can_disable(&n)), Ok(Verdict::Blocked(_)) | Err(_)))
+        .filter(|p| tvs_kb::preselect(tvs_kb::get(&p.name), mode))
+        .filter_map(|p| PackageName::new(p.name.clone()).ok()).collect();
+    let facts = tvs_device::inventory::gather_facts(m, &s(), &installed, &wanted);
+    let verdicts = tvs_safety::guards::evaluate_selection(&wanted, &facts);
+    wanted.iter().filter(|n| matches!(verdicts.get(*n), Some(Verdict::Allowed))).map(|n| n.to_string()).collect()
+}
+
+#[test]
+fn guided_setup_on_the_g09_is_safe_in_both_clean_up_modes() {
+    for mode in [tvs_kb::Mode::Safe, tvs_kb::Mode::Balanced] {
+        let m = tv();
+        let picked = guided_selection(&m, mode);
+        assert!(!picked.is_empty(), "{mode:?} should find something to turn off on a G09");
+        for never in ["com.google.android.tungsten.setupwraith", "com.tcl.tvinput", "com.google.android.apps.tv.launcherx", "com.android.tv.settings", "com.tcl.tv", "com.google.android.gms"] {
+            assert!(!picked.iter().any(|p| p == never), "{mode:?} must not pick {never}");
+        }
+        let mut input = DeployInput { profile: Profile::new("guided"), theme: None, apk: None, batch_size: 5, settle: Duration::ZERO };
+        input.profile.debloat.packages = picked.clone();
+        input.profile.settings.animation_scale = Some("0.5".into());
+        let p = plan(&m, &s(), &input).unwrap();
+        assert!(p.runnable, "{mode:?}: {:#?}", blocked(&p));
+        let r = run(&m, &s(), &p, &input, &mut Hooks0::default());
+        assert!(r.completed, "{mode:?}: {:#?}", r.results);
+        let d = m.device(DEMO_SERIAL).unwrap();
+        for n in &picked { assert!(!d.packages[n], "{n}"); }
+        assert!(d.packages["com.google.android.apps.tv.launcherx"] && d.home.as_deref() == Some(STOCK_HOME), "the guide never touches Home");
+    }
+}

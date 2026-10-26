@@ -20,15 +20,22 @@ import { ProfilesPage } from "./pages/ProfilesPage";
 import { BenchmarksPage } from "./pages/BenchmarksPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage";
+import { GuidePage } from "./pages/GuidePage";
 import { emptyProfile, type Profile } from "./lib/ipc";
 
 const GROUPS = ["Device", "Design", "Clean up", "Apply", "App"] as const;
-const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore", "themes", "editor", "launcher", "deploy", "profiles", "benchmarks", "privacy", "diagnostics"]);
+const BUILT = new Set<SectionId>(["guide", "dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore", "themes", "editor", "launcher", "deploy", "profiles", "benchmarks", "privacy", "diagnostics"]);
+
+const GUIDED_KEY = "tvs-guided-done";
+const guidedDone = () => { try { return localStorage.getItem(GUIDED_KEY) === "1"; } catch { return false; } };
+const markGuided = () => { try { localStorage.setItem(GUIDED_KEY, "1"); } catch { /* per-viewer convenience only */ } };
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
-  const [active, setActive] = useState<SectionId>("dashboard");
+  const [active, setActiveRaw] = useState<SectionId>(() => (guidedDone() ? "dashboard" : "guide"));
+  // The first-run guide opens once; leaving it by any route counts as seen.
+  const setActive = (id: SectionId) => { if (id !== "guide") markGuided(); setActiveRaw(id); };
   const [serial, setSerial] = useState<string | null>(null);
   const editor = useThemeEditor();
   const [profile, setProfile] = useState<Profile>(emptyProfile());
@@ -106,6 +113,7 @@ export function App() {
         </header>
         <div className="px-8 py-6">
           {loadErr && <div className="mb-5 max-w-2xl"><ErrorNote message={loadErr} /></div>}
+          {current.id === "guide" && <GuidePage serial={serial} onSelect={setSerial} editor={editor} onFinish={() => setActive("dashboard")} onOpen={setActive} />}
           {current.id === "dashboard" && <Dashboard />}
           {current.id === "settings" && settings && <SettingsPage key={JSON.stringify(settings)} settings={settings} onSaved={setSettings} />}
           {current.id === "connect" && <ConnectPage onConnected={(s) => { setSerial(s); setActive("inspector"); }} />}

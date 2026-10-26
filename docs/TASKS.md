@@ -78,6 +78,12 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [ ] Real-TV pass: the checklist in TESTING.md, on at least one Google TV and one Android TV
 - [ ] Automated UI run of the desktop app in demo mode (tauri-driver, Windows only)
 
+## M11 Guided first run
+- [x] "Guided setup" section (opens on first launch, then never again unless chosen): get ready (adb) → connect → look at your TV → choose a goal → check (dry run) → apply, with a plain-language result, undo and next steps (5 UI tests)
+- [x] Goals: gentle clean-up (Safe), standard clean-up (Balanced), clean-up + Studio launcher + current theme. Never disables the stock launcher, never touches DNS. Anything the TV's live checks don't plainly allow is left out and listed with its reason
+- [x] E2E: the guide's exact selection logic runs on the simulated G09 in both modes (nothing protected picked, Home untouched)
+- [ ] Watch a first-time user (you) go through it on a real TV and note where it confuses
+
 ## M10 Release + final review
 - [x] adb: not bundled (Google SDK licence §3.4); Dashboard "Get adb from Google" downloads the official zip on request, with host allow-list, size caps, fixed-name extraction and a Windows signature check (3 tests + UI test)
 - [x] Final security review: 8 findings fixed (docs/SECURITY.md)

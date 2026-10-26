@@ -9,9 +9,9 @@ it does not mean a given TV behaves the way the simulator assumes.
 ## How to run
 
 ```powershell
-cargo test --workspace                          # 151 core tests, including the 13 end-to-end scenarios
+cargo test --workspace                          # 152 core tests, including the 14 end-to-end scenarios
 cargo clippy --workspace --all-targets -- -D warnings
-pnpm typecheck; pnpm test                       # 40 UI tests
+pnpm typecheck; pnpm test                       # 45 UI tests
 cd launcher; .\gradlew.bat testReleaseUnitTest lintRelease   # launcher (needs the Android SDK; CI runs it)
 ```
 
@@ -47,6 +47,7 @@ Its model and fingerprint end in "(simulated)" and "demo-keys", so it can never 
 | Interrupted run, then resume | `interrupted_run_resumes_from_the_tvs_real_state` | Every package disabled exactly once in total |
 | Benchmark reproducibility | `benchmark_is_reproducible_and_the_verdict_is_cautious` | Same launcher twice → never "better"/"worse"; after switching → "better" with ≥5 samples; nothing changed on the TV |
 | Privacy audit | `privacy_audit_on_the_simulated_tv` | Mic history found; wording never says "listening"; read-only |
+| Guided setup's selection (both clean-up modes) | `guided_setup_on_the_g09_is_safe_in_both_clean_up_modes` | Nothing protected picked, plan runnable, Home untouched |
 | Pairing + connect (demo world) | `the_demo_world_connects_and_pairs` | Wrong code refused, right code pairs |
 
 More focused cases (reconnect give-up, sensitive-app confirmations, wrong-TV profile, Private DNS on old
@@ -78,5 +79,5 @@ Record each result in TASKS.md with the TV model and firmware. Until then, the c
 
 ## Not automated yet
 
-- Driving the desktop window itself (tauri-driver + WebDriver) only works on Windows. Planned for CI's Windows job; UI behaviour is covered by the 40 component tests in the meantime.
+- Driving the desktop window itself (tauri-driver + WebDriver) only works on Windows. Planned for CI's Windows job; UI behaviour is covered by the 45 component tests in the meantime.
 - The launcher's Android UI is checked by its unit tests and lint, not by an emulator run.

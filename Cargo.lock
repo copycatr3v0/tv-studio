@@ -3842,6 +3842,7 @@ dependencies = [
  "tvs-deploy",
  "tvs-device",
  "tvs-insight",
+ "tvs-kb",
  "tvs-launcher",
  "tvs-recovery",
  "tvs-safety",

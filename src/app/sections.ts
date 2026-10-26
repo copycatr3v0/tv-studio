@@ -1,11 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Boxes, Cable, Gauge, HardDriveDownload, History, LayoutDashboard, MonitorSmartphone,
+  Boxes, Cable, Compass, Gauge, HardDriveDownload, History, LayoutDashboard, MonitorSmartphone,
   Package, Palette, Paintbrush, Rocket, Settings, ShieldCheck, Stethoscope, Trash2,
 } from "lucide-react";
 
 export type SectionId =
-  | "dashboard" | "connect" | "inspector" | "themes" | "editor" | "launcher" | "apps" | "debloat"
+  | "guide" | "dashboard" | "connect" | "inspector" | "themes" | "editor" | "launcher" | "apps" | "debloat"
   | "privacy" | "benchmarks" | "deploy" | "profiles" | "restore" | "diagnostics" | "settings";
 
 /** Where a section's changes land, shown on every page (prompt §14). */
@@ -24,6 +24,7 @@ export interface Section {
 }
 
 export const SECTIONS: readonly Section[] = [
+  { id: "guide", label: "Guided setup", icon: Compass, group: "Device", milestone: "M11", scope: ["manual", "android", "launcher"], summary: "From nothing to a cleaned-up TV in six steps, with every change checked and undoable." },
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Device", milestone: "M3", scope: ["app"], summary: "App status and connected TVs." },
   { id: "connect", label: "Connect TV", icon: Cable, group: "Device", milestone: "M4", scope: ["manual", "android"], summary: "Developer options guide, pairing, legacy ADB connect and diagnostics." },
   { id: "inspector", label: "Device Inspector", icon: MonitorSmartphone, group: "Device", milestone: "M4", scope: ["android"], summary: "Model, Android version, fingerprint, RAM, storage, current Home and HOME candidates." },

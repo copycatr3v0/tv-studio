@@ -6,7 +6,7 @@ with verification, and exact rollback. No app needs to be installed on the TV un
 custom launcher.
 
 Status: **feature-complete, simulator-tested.** All 10 milestones are done except real-TV validation:
-151 core tests, 40 UI tests and 13 end-to-end scenarios pass on a simulated TCL Google TV, but nothing has been
+152 core tests, 45 UI tests and 14 end-to-end scenarios pass on a simulated TCL Google TV, but nothing has been
 confirmed on real hardware yet. See [docs/TESTING.md](docs/TESTING.md) for the real-TV checklist and
 [docs/SECURITY.md](docs/SECURITY.md) for the safety rules and the final review. See [docs/PLAN.md](docs/PLAN.md) and [docs/TASKS.md](docs/TASKS.md).
 
@@ -44,6 +44,10 @@ pnpm test               # UI tests
 cargo test --workspace  # core tests
 pnpm tauri build        # NSIS installer + target\release\tv-studio.exe
 ```
+
+### First run
+
+The app opens on **Guided setup**: six steps from getting adb to a verified, undoable clean-up. The other pages are there when you want finer control.
 
 ### Try it without a TV
 
