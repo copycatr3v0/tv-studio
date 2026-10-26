@@ -28,10 +28,10 @@ describe("navigation", () => {
 
 describe("planned sections", () => {
   it("render no interactive controls", () => {
-    const s = SECTIONS.find((x) => x.id === "debloat")!;
+    const s = SECTIONS.find((x) => x.id === "themes")!;
     const { container } = render(<Planned section={s} />);
     expect(container.querySelectorAll("button, input, select, textarea")).toHaveLength(0);
-    expect(screen.getByText("M5")).toBeInTheDocument();
+    expect(screen.getByText("M6")).toBeInTheDocument();
   });
 });
 

@@ -25,6 +25,12 @@ pub struct MockDevice {
     pub text_files: BTreeMap<String, String>,
     /// Output of `df /data`.
     pub df_data: Option<String>,
+    /// `dumpsys <args...>` output keyed by the joined args, e.g. "wifi" or "package com.x".
+    pub dumpsys: BTreeMap<String, String>,
+    /// `cmd package query-activities` answers keyed by the `-a` action (HOME uses `home_claimants`).
+    pub activity_queries: BTreeMap<String, Vec<String>>,
+    /// Packages that are system apps (`pm list packages -s`).
+    pub system: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,8 +143,13 @@ impl Transport for MockTransport {
             ["getprop", key] => ok(format!("{}\n", dev.props.get(*key).cloned().unwrap_or_default())),
             ["pm", "list", "packages", rest @ ..] => {
                 let want = |en: bool| if rest.contains(&"-d") { !en } else if rest.contains(&"-e") { en } else { true };
-                ok(dev.packages.iter().filter(|(_, &en)| want(en)).map(|(p, _)| format!("package:{p}\n")).collect::<String>())
+                let sys = rest.contains(&"-s");
+                ok(dev.packages.iter().filter(|(p, &en)| want(en) && (!sys || dev.system.contains(*p))).map(|(p, _)| format!("package:{p}\n")).collect::<String>())
             }
+            ["dumpsys", args @ ..] => match dev.dumpsys.get(&args.join(" ")) {
+                Some(t) => ok(t.clone()),
+                None => fail(format!("mock: no dumpsys {}", args.join(" ")), 1),
+            },
             ["pm", "disable-user", "--user", "0", pkg] => {
                 if !dev.packages.contains_key(*pkg) { return fail(format!("Unknown package: {pkg}"), 1); }
                 if dev.refuse_disable.contains(*pkg) {
@@ -159,7 +170,14 @@ impl Transport for MockTransport {
                 let home = dev.home.clone().unwrap_or_else(|| "android/com.android.internal.app.ResolverActivity".into());
                 ok(format!("priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n{home}\n"))
             }
-            ["cmd", "package", "query-activities", "--brief", ..] => ok(dev.home_claimants.iter().map(|c| format!("{c}\n")).collect::<String>()),
+            ["cmd", "package", "query-activities", "--brief", rest @ ..] => {
+                let action = rest.iter().position(|a| *a == "-a").and_then(|i| rest.get(i + 1)).copied().unwrap_or_default();
+                let list = if rest.contains(&"android.intent.category.HOME") { Some(&dev.home_claimants) } else { dev.activity_queries.get(action) };
+                match list {
+                    Some(l) => ok(l.iter().map(|c| format!("{c}\n")).collect::<String>()),
+                    None => ok("No activities found\n"),
+                }
+            }
             ["cmd", "package", "set-home-activity", "--user", "0", comp] => {
                 let pkg = comp.split('/').next().unwrap_or_default();
                 if dev.packages.get(pkg) == Some(&true) { dev.home = Some((*comp).into()); }

@@ -10,6 +10,9 @@ use regex::Regex;
 use serde::Serialize;
 use tvs_core::{Component, PackageName};
 
+pub mod guards;
+pub use guards::{evaluate_selection, DeviceFacts, KNOWN_STOCK_LAUNCHERS};
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", content = "reason")]
 pub enum Verdict {
@@ -118,6 +121,13 @@ mod tests {
         ] {
             assert!(!is_core_package(&p(name)), "{name} should not be core");
         }
+    }
+
+    #[test]
+    fn verdict_json_shape_matches_ui_schema() {
+        assert_eq!(serde_json::to_string(&Verdict::Allowed).unwrap(), r#"{"kind":"Allowed"}"#);
+        assert_eq!(serde_json::to_string(&Verdict::Blocked("x".into())).unwrap(), r#"{"kind":"Blocked","reason":"x"}"#);
+        assert_eq!(serde_json::to_string(&Verdict::NeedsConfirm("y".into())).unwrap(), r#"{"kind":"NeedsConfirm","reason":"y"}"#);
     }
 
     #[test]

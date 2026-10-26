@@ -163,6 +163,11 @@ impl Store {
         Ok(n == 1)
     }
 
+    pub fn save_snapshot(&self, fingerprint: &str, kind: &str, body: &serde_json::Value) -> Result<i64> {
+        self.conn.execute("INSERT INTO snapshots(fingerprint, kind, body) VALUES(?1, ?2, ?3)", params![fingerprint, kind, body.to_string()])?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
     pub fn baseline(&self, fingerprint: &str) -> Result<Option<serde_json::Value>> {
         let raw: Option<String> = self.conn
             .query_row("SELECT body FROM snapshots WHERE fingerprint=?1 AND kind='baseline'", params![fingerprint], |r| r.get(0))
@@ -231,6 +236,18 @@ mod tests {
         assert!(s.save_baseline_once("google/tv/G09:12/STT2", &json!({"home": "stock"})).unwrap());
         assert!(!s.save_baseline_once("google/tv/G09:12/STT2", &json!({"home": "broken"})).unwrap());
         assert_eq!(s.baseline("google/tv/G09:12/STT2").unwrap(), Some(json!({"home": "stock"})));
+    }
+
+    #[test]
+    fn pre_deploy_snapshots_accumulate_and_kind_is_checked() {
+        let s = Store::open_in_memory().unwrap();
+        s.upsert_device("d", "x", None, None, None).unwrap();
+        assert!(s.save_snapshot("d", "pre_deploy", &json!({})).is_ok());
+        assert!(s.save_snapshot("d", "pre_deploy", &json!({})).is_ok());
+        assert!(s.save_snapshot("d", "bogus", &json!({})).is_err());
+        // A second baseline through this path is refused by the unique index too.
+        s.save_baseline_once("d", &json!({"a": 1})).unwrap();
+        assert!(s.save_snapshot("d", "baseline", &json!({"a": 2})).is_err());
     }
 
     #[test]

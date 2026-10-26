@@ -1,6 +1,7 @@
 // Typed, validated bridge to the Rust commands. Every response is parsed with Zod so a Rust/TS drift
 // fails loudly instead of rendering wrong device state.
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { z } from "zod";
 
 export const UiMode = z.enum(["beginner", "advanced"]);
@@ -78,6 +79,54 @@ export const DeviceInfo = z.object({
 });
 export type DeviceInfo = z.infer<typeof DeviceInfo>;
 
+export const Verdict = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("Allowed") }),
+  z.object({ kind: z.literal("NeedsConfirm"), reason: z.string() }),
+  z.object({ kind: z.literal("Blocked"), reason: z.string() }),
+]);
+export type Verdict = z.infer<typeof Verdict>;
+
+export const KbCategory = z.enum(["telemetry", "ads_content", "retail_demo", "preinstalled", "streaming", "voice", "casting", "updater", "launcher", "factory", "privacy", "other"]);
+export type KbCategory = z.infer<typeof KbCategory>;
+export const KbEntry = z.object({
+  disabled_in: z.number().int(), kept_in: z.number().int(), category: KbCategory,
+  notes: z.array(z.string()), devices: z.array(z.string()),
+  privacy: z.object({ category: z.string(), note: z.string() }).optional(),
+});
+export type KbEntry = z.infer<typeof KbEntry>;
+export const AppRow = z.object({
+  name: z.string(), enabled: z.boolean(), system: z.boolean(), kb: KbEntry.nullable(), verdict: Verdict,
+  preselect_safe: z.boolean(), preselect_balanced: z.boolean(),
+});
+export type AppRow = z.infer<typeof AppRow>;
+export const Inventory = z.object({ apps: z.array(AppRow), kb_lists: z.number().int() });
+export type Inventory = z.infer<typeof Inventory>;
+
+export const Evaluation = z.object({ verdicts: z.record(Verdict), facts: z.record(z.unknown()) });
+export type Evaluation = z.infer<typeof Evaluation>;
+
+export const ChangeReport = z.object({
+  changed: z.array(z.string()), refused: z.array(z.tuple([z.string(), z.string()])),
+  unchanged: z.array(z.string()), skipped: z.array(z.string()), stopped: z.string().nullable(),
+});
+export type ChangeReport = z.infer<typeof ChangeReport>;
+export const ApplyResult = z.object({ report: ChangeReport, baseline_created: z.boolean(), identity: z.string() });
+export type ApplyResult = z.infer<typeof ApplyResult>;
+
+export const RestorePlan = z.object({
+  enable: z.array(z.string()), left_disabled: z.array(z.string()), not_in_snapshot: z.array(z.string()),
+  set_home: z.string().nullable(), settings: z.array(z.tuple([z.string(), z.string().nullable()])),
+});
+export type RestorePlan = z.infer<typeof RestorePlan>;
+export const RestorePreview = z.object({ plan: RestorePlan, baseline_created: z.string() });
+export type RestorePreview = z.infer<typeof RestorePreview>;
+
+export const Progress = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("package"), name: z.string(), index: z.number(), total: z.number() }),
+  z.object({ kind: z.literal("verified"), batch: z.number(), batches: z.number() }),
+]);
+export type Progress = z.infer<typeof Progress>;
+
 export const CmdError = z.object({
   kind: z.enum(["store", "transport", "invalid"]),
   message: z.unknown(),
@@ -133,6 +182,18 @@ export const api = {
   discover: () => call("discover_wireless", z.array(MdnsService)),
   disconnect: (serial: string) => call("disconnect_tv", z.null(), { serial }),
   probe: (serial: string) => call("probe_device", DeviceInfo, { serial }),
+  inventory: (serial: string) => call("inventory", Inventory, { serial }),
+  evaluate: (serial: string, packages: string[]) => call("evaluate_debloat", Evaluation, { serial, packages }),
+  applyDebloat: (serial: string, packages: string[], confirmed: string[]) =>
+    call("apply_debloat", ApplyResult, { request: { serial, packages, confirmed } }),
+  restorePreview: (serial: string, scope: string[] | null) => call("restore_preview", RestorePreview, { serial, scope }),
+  restoreApply: (serial: string, scope: string[] | null) => call("restore_apply", ChangeReport, { serial, scope }),
 };
+
+/** Subscribe to batch progress; returns an unsubscribe function (no-op outside Tauri). */
+export async function onProgress(cb: (p: Progress) => void): Promise<() => void> {
+  if (!inTauri()) return () => {};
+  return listen("debloat-progress", (e) => { const r = Progress.safeParse(e.payload); if (r.success) cb(r.data); });
+}
 
 export const __test = { describe };

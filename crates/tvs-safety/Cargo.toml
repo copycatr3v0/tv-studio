@@ -9,3 +9,6 @@ tvs-core.workspace = true
 serde.workspace = true
 regex.workspace = true
 once_cell.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

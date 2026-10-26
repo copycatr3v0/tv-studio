@@ -3658,6 +3658,8 @@ dependencies = [
  "thiserror 1.0.69",
  "tvs-core",
  "tvs-device",
+ "tvs-kb",
+ "tvs-recovery",
  "tvs-safety",
  "tvs-store",
  "tvs-transport",
@@ -3686,12 +3688,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "tvs-kb"
+version = "0.1.0"
+dependencies = [
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "tvs-recovery"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tvs-core",
+ "tvs-device",
+ "tvs-transport",
+]
+
+[[package]]
 name = "tvs-safety"
 version = "0.1.0"
 dependencies = [
  "once_cell",
  "regex",
  "serde",
+ "serde_json",
  "tvs-core",
 ]
 

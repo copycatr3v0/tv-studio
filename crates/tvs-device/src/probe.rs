@@ -88,13 +88,23 @@ pub struct DeviceInfo {
 impl DeviceInfo {
     /// Stable identity for snapshots: the build fingerprint plus the serial's host is not stable
     /// (DHCP), so the fingerprint plus model is used; a TV without a fingerprint falls back to the serial.
-    pub fn identity(&self) -> String {
-        match (&self.fingerprint, &self.model) {
-            (Some(f), Some(m)) => format!("{m}|{f}"),
-            (Some(f), None) => f.clone(),
-            _ => format!("serial:{}", self.serial),
-        }
+    pub fn identity(&self) -> String { identity_from(self.fingerprint.as_deref(), self.model.as_deref(), &self.serial) }
+}
+
+pub fn identity_from(fingerprint: Option<&str>, model: Option<&str>, serial: &Serial) -> String {
+    match (fingerprint, model) {
+        (Some(f), Some(m)) => format!("{m}|{f}"),
+        (Some(f), None) => f.to_string(),
+        _ => format!("serial:{serial}"),
     }
+}
+
+/// Identity from two getprop calls; None when the TV does not answer (never guessed).
+pub fn quick_identity(t: &dyn Transport, serial: &Serial) -> Option<String> {
+    let get = |k: &'static str| t.shell(serial, &ShellCommand::new("getprop").arg(k)).ok()
+        .filter(|o| o.code == Some(0)).map(|o| o.stdout.trim().to_string()).filter(|v| !v.is_empty());
+    let fp = get("ro.build.fingerprint")?;
+    Some(identity_from(Some(&fp), get("ro.product.model").as_deref(), serial))
 }
 
 pub fn parse_getprop(out: &str) -> BTreeMap<String, String> {

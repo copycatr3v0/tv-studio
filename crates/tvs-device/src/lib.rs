@@ -2,6 +2,7 @@
 
 pub mod endpoint;
 pub mod oem;
+pub mod inventory;
 pub mod probe;
 
 pub use endpoint::{advice, probe_port, Endpoint, EndpointError, PortState, DEFAULT_PORT};

@@ -28,9 +28,14 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [ ] Real-device validation on one Google TV and one Android TV (only mock-tested so far)
 
 ## M5 Inventory, safety, snapshot
-- [ ] Import CleanYourTV examples → kb.sqlite (with attribution)
-- [~] Guards 1–11 from RESEARCH §2 + ported fixtures (static ones done: core block, factory never-start, launcher usability, name validation)
-- [ ] Snapshot/restore (first-wins), Debloat Center UI
+- [x] Import CleanYourTV examples → `crates/tvs-kb/data/kb.json` via `tools/build_kb.py` (316 lists, 1,691 packages, attributed)
+- [x] Guards: core block, name validation, factory never-start, Home guard (selection-aware), setupwraith Wi-Fi, TV_INPUT_HARDWARE, input/Settings handlers, CVTE launcher, essential-service confirmations; all fail closed, no override (13 + 2 device tests)
+- [x] Inventory (all/disabled/system per user 0), live facts gathering
+- [x] Baseline (write-once) + pre-change snapshots; verified batch disable with stop-on-refusal / stop-on-disconnect, no blind retry; exact restore (full or scoped) with readback (9 tests)
+- [x] Applications, Debloat Center (Safe / Balanced / Advanced, dry-run check, per-item confirmation) and Restore UI (4 UI tests)
+- [ ] Real-device round trip on a Google TV and an Android TV (mock-only so far)
 
-## M6–M10
+## M6 Launcher fork + theme system (next)
+
+## M7–M10
 See PLAN.md. Tasks get broken down when each milestone starts.

@@ -6,10 +6,13 @@ import { Planned } from "./pages/Planned";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { InspectorPage } from "./pages/InspectorPage";
+import { ApplicationsPage } from "./pages/ApplicationsPage";
+import { DebloatPage } from "./pages/DebloatPage";
+import { RestorePage } from "./pages/RestorePage";
 import { ErrorNote } from "./components/ui";
 
 const GROUPS = ["Device", "Design", "Clean up", "Apply", "App"] as const;
-const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector"]);
+const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore"]);
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -80,6 +83,9 @@ export function App() {
           {current.id === "settings" && settings && <SettingsPage key={JSON.stringify(settings)} settings={settings} onSaved={setSettings} />}
           {current.id === "connect" && <ConnectPage onConnected={(s) => { setSerial(s); setActive("inspector"); }} />}
           {current.id === "inspector" && <InspectorPage serial={serial} onSelect={setSerial} />}
+          {current.id === "apps" && <ApplicationsPage serial={serial} onSelect={setSerial} />}
+          {current.id === "debloat" && <DebloatPage serial={serial} onSelect={setSerial} />}
+          {current.id === "restore" && <RestorePage serial={serial} onSelect={setSerial} />}
           {!BUILT.has(current.id) && <Planned section={current} />}
         </div>
       </main>

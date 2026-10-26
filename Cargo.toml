@@ -21,6 +21,8 @@ tvs-transport = { path = "crates/tvs-transport" }
 tvs-safety = { path = "crates/tvs-safety" }
 tvs-store = { path = "crates/tvs-store" }
 tvs-device = { path = "crates/tvs-device" }
+tvs-kb = { path = "crates/tvs-kb" }
+tvs-recovery = { path = "crates/tvs-recovery" }
 
 [profile.release]
 lto = true

@@ -126,3 +126,52 @@ fn parsers() {
     assert_eq!(props.get("ro.a").map(String::as_str), Some("x"));
     assert_eq!(props.get("ro.empty").map(String::as_str), Some(""));
 }
+
+#[test]
+fn facts_from_device_drive_the_guards() {
+    use crate::inventory::{gather_facts, list_packages};
+    use tvs_core::PackageName;
+    use tvs_safety::{evaluate_selection, Verdict};
+    let m = MockTransport::new();
+    let mut d = google_tv();
+    d.packages.insert("com.tcl.tvinput".into(), true);
+    d.packages.insert("com.android.tv.settings".into(), true);
+    d.system.insert("com.tcl.tv".into());
+    d.dumpsys.insert("package com.tcl.logkit".into(), "requested permissions:\n  android.permission.INTERNET\ninstall permissions:\n".into());
+    d.dumpsys.insert("package com.tcl.tvinput".into(), "requested permissions:\n  android.permission.TV_INPUT_HARDWARE\nUser 0:\n".into());
+    d.dumpsys.insert("package com.tcl.tv".into(), "requested permissions:\n".into());
+    d.dumpsys.insert("package com.google.android.tungsten.setupwraith".into(), "requested permissions:\n".into());
+    d.dumpsys.insert("package com.google.android.apps.tv.launcherx".into(), "requested permissions:\n".into());
+    d.dumpsys.insert("wifi".into(), "WifiConfigManager: SSID \"Home\" cname=com.google.android.tungsten.setupwraith".into());
+    d.activity_queries.insert("android.intent.action.VIEW".into(), vec!["com.tcl.tv/.PassthroughActivity".into()]);
+    d.activity_queries.insert("android.settings.SETTINGS".into(), vec!["com.android.tv.settings/.MainSettings".into()]);
+    m.add_device("tv:5555", d);
+    let sn = s("tv:5555");
+    let installed = list_packages(&m, &sn).unwrap();
+    assert!(installed.iter().any(|p| p.name == "com.tcl.tv" && p.system));
+    assert!(installed.iter().any(|p| p.name == "com.tcl.ttvs" && !p.enabled));
+    let sel: Vec<PackageName> = ["com.tcl.logkit", "com.tcl.tvinput", "com.tcl.tv", "com.google.android.tungsten.setupwraith", "com.google.android.apps.tv.launcherx"]
+        .iter().map(|p| PackageName::new(*p).unwrap()).collect();
+    let f = gather_facts(&m, &sn, &installed, &sel);
+    assert!(f.home_known && f.input_hardware_checked && f.handlers_checked);
+    assert_eq!(f.setupwraith_owns_wifi, Some(true));
+    let v = evaluate_selection(&sel, &f);
+    let get = |n: &str| v[&PackageName::new(n).unwrap()].clone();
+    assert_eq!(get("com.tcl.logkit"), Verdict::Allowed);
+    for n in ["com.tcl.tvinput", "com.tcl.tv", "com.google.android.tungsten.setupwraith", "com.google.android.apps.tv.launcherx"] {
+        assert!(matches!(get(n), Verdict::Blocked(_)), "{n}: {:?}", get(n));
+    }
+}
+
+#[test]
+fn failed_dumpsys_fails_closed() {
+    use crate::inventory::{gather_facts, list_packages};
+    let m = MockTransport::new();
+    m.add_device("tv:5555", google_tv()); // no dumpsys answers at all
+    let sn = s("tv:5555");
+    let installed = list_packages(&m, &sn).unwrap();
+    let sel = [tvs_core::PackageName::new("com.tcl.logkit").unwrap()];
+    let f = gather_facts(&m, &sn, &installed, &sel);
+    assert!(!f.input_hardware_checked);
+    assert!(matches!(tvs_safety::evaluate_selection(&sel, &f)[&sel[0]], tvs_safety::Verdict::Blocked(_)));
+}

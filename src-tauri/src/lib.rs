@@ -11,8 +11,10 @@ use tvs_core::Serial;
 use tvs_device::{advice, probe_port, DeviceInfo, Endpoint, PortState, DEFAULT_PORT};
 use tvs_transport::{find_adb, AdbExeTransport, DeviceEntry, DeviceState, MdnsService, PairingCode, Transport, TransportError};
 
+mod debloat;
+
 pub struct AppState {
-    store: Mutex<Store>,
+    pub(crate) store: Mutex<Store>,
     db_path: PathBuf,
     resource_dir: Option<PathBuf>,
 }
@@ -27,7 +29,7 @@ pub enum CmdError {
 impl From<tvs_store::StoreError> for CmdError { fn from(e: tvs_store::StoreError) -> Self { CmdError::Store(e.to_string()) } }
 impl From<tvs_device::EndpointError> for CmdError { fn from(e: tvs_device::EndpointError) -> Self { CmdError::Invalid(e.to_string()) } }
 impl From<TransportError> for CmdError { fn from(e: TransportError) -> Self { CmdError::Transport(e) } }
-type CmdResult<T> = Result<T, CmdError>;
+pub(crate) type CmdResult<T> = Result<T, CmdError>;
 
 #[derive(Debug, Serialize)]
 pub struct AdbInfo { path: String, version: Option<String>, source: &'static str }
@@ -45,7 +47,7 @@ fn resolve_adb(state: &AppState, settings: &AppSettings) -> Option<(PathBuf, &'s
     find_adb(None).map(|p| (p, "system"))
 }
 
-fn transport(state: &AppState) -> CmdResult<AdbExeTransport> {
+pub(crate) fn transport(state: &AppState) -> CmdResult<AdbExeTransport> {
     let settings = state.store.lock().unwrap().settings()?;
     resolve_adb(state, &settings).map(|(p, _)| AdbExeTransport::new(p)).ok_or(CmdError::Transport(TransportError::AdbMissing))
 }
@@ -87,11 +89,11 @@ async fn list_devices(state: tauri::State<'_, AppState>) -> CmdResult<Vec<Device
         .map_err(CmdError::from)
 }
 
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> CmdResult<T> + Send + 'static) -> CmdResult<T> {
+pub(crate) async fn blocking<T: Send + 'static>(f: impl FnOnce() -> CmdResult<T> + Send + 'static) -> CmdResult<T> {
     tauri::async_runtime::spawn_blocking(f).await.map_err(|e| CmdError::Invalid(e.to_string()))?
 }
 
-fn serial_arg(s: &str) -> CmdResult<Serial> { Serial::new(s).map_err(|e| CmdError::Invalid(e.to_string())) }
+pub(crate) fn serial_arg(s: &str) -> CmdResult<Serial> { Serial::new(s).map_err(|e| CmdError::Invalid(e.to_string())) }
 
 #[derive(Debug, Serialize)]
 pub struct Diagnosis { endpoint: String, port_state: PortState, advice: &'static str }
@@ -179,7 +181,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             app_info, get_settings, save_settings, list_devices, diagnose, connect_tv, pair_tv,
-            discover_wireless, disconnect_tv, probe_device
+            discover_wireless, disconnect_tv, probe_device, debloat::inventory, debloat::evaluate_debloat,
+            debloat::apply_debloat, debloat::restore_preview, debloat::restore_apply
         ])
         .run(tauri::generate_context!())
         .expect("error while running Android TV Customizer Studio");

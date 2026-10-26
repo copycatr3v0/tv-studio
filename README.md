@@ -5,7 +5,7 @@ reversible debloating, a visual theme studio, an optional lightweight launcher, 
 with verification, and exact rollback. No app needs to be installed on the TV unless you choose the
 custom launcher.
 
-Status: **M3 (Windows shell)**. See [docs/PLAN.md](docs/PLAN.md) and [docs/TASKS.md](docs/TASKS.md).
+Status: **M5 (inventory, safe debloat, baseline and restore)** done on the simulated TV; real-TV validation pending. See [docs/PLAN.md](docs/PLAN.md) and [docs/TASKS.md](docs/TASKS.md).
 
 ## Layout
 
@@ -16,6 +16,9 @@ Status: **M3 (Windows shell)**. See [docs/PLAN.md](docs/PLAN.md) and [docs/TASKS
 | `crates/tvs-core` | Validated identifiers (package, component, serial) |
 | `crates/tvs-transport` | ADB transport trait, adb.exe driver, scriptable mock TV |
 | `crates/tvs-safety` | Hard safety rules (core packages, factory packages, launcher checks) |
+| `crates/tvs-device` | Endpoint parsing, TCP diagnostics, capability probe, OEM families, package inventory, guard facts |
+| `crates/tvs-kb` | Package evidence from 316 tested TVs (built by `tools/build_kb.py`) |
+| `crates/tvs-recovery` | Baseline snapshots, verified batch disabling, exact restore |
 | `crates/tvs-store` | SQLite: settings, devices, write-once baselines, versioned profiles, journal |
 | `docs/` | Research, spec, architecture, capability matrix, plan |
 
