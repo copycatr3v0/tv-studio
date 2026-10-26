@@ -29,7 +29,7 @@ export function RevertPanel({ serial, onDone }: { serial: string; onDone?: () =>
       if (!st.created) { setState({ kind: "untouched" }); return; }
       const preview = await api.restorePreview(serial, null);
       const p = preview.plan;
-      setState(p.enable.length || p.set_home || p.settings.length ? { kind: "ready", preview } : { kind: "matches", created: st.created });
+      setState(p.enable.length || p.set_home || p.settings.length || preview.studio_launcher ? { kind: "ready", preview } : { kind: "matches", created: st.created });
     } catch (e) { setState({ kind: "error", message: errMsg(e) }); }
   };
   useEffect(() => { setReport(null); setAsk(false); void load(); }, [serial]);
@@ -56,6 +56,7 @@ export function RevertPanel({ serial, onDone }: { serial: string; onDone?: () =>
               {p.enable.length > 0 && <li><div className="font-medium">Re-enable {p.enable.length} package{p.enable.length === 1 ? "" : "s"}</div><div className="selectable font-mono text-xs text-ink-400">{p.enable.join(", ")}</div></li>}
               {p.set_home && <li><div className="font-medium">Set the Home screen back to</div><div className="selectable font-mono text-xs text-ink-400">{p.set_home}</div></li>}
               {p.settings.map(([k, v]) => <li key={k}><span className="font-medium">{k}</span> <span className="text-ink-400">→ {v ?? "default (unset)"}</span></li>)}
+              {state.preview.studio_launcher && <li><div className="font-medium">Remove the Studio launcher and its themes</div><div className="text-xs text-ink-400">Only after the stock Home is confirmed on screen; if it can't be confirmed, the launcher is kept and you're told why.</div></li>}
             </ul>
             {p.left_disabled.length > 0 && <p className="text-xs text-ink-400">Stay disabled, because they were already disabled before this app changed anything: {p.left_disabled.join(", ")}</p>}
             {p.not_in_snapshot.length > 0 && <p className="text-xs text-ink-400">Not on the TV originally, left alone: {p.not_in_snapshot.join(", ")}</p>}

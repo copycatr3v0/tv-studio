@@ -99,6 +99,12 @@ pub fn identity_from(fingerprint: Option<&str>, model: Option<&str>, serial: &Se
     }
 }
 
+/// Android API level from one getprop call; None when unreadable.
+pub fn quick_sdk(t: &dyn Transport, serial: &Serial) -> Option<u32> {
+    t.shell(serial, &ShellCommand::new("getprop").arg("ro.build.version.sdk")).ok()
+        .filter(|o| o.code == Some(0)).and_then(|o| o.stdout.trim().parse().ok())
+}
+
 /// Identity from two getprop calls; None when the TV does not answer (never guessed).
 pub fn quick_identity(t: &dyn Transport, serial: &Serial) -> Option<String> {
     let get = |k: &'static str| t.shell(serial, &ShellCommand::new("getprop").arg(k)).ok()

@@ -184,6 +184,26 @@ impl Store {
     }
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ProfileMeta { pub name: String, pub version: i64, pub created: String }
+
+impl Store {
+    /// Every saved version whose name starts with `prefix`, newest first.
+    pub fn list_profiles(&self, prefix: &str) -> Result<Vec<ProfileMeta>> {
+        let mut st = self.conn.prepare(
+            "SELECT name, version, created FROM profiles WHERE substr(name, 1, length(?1)) = ?1 ORDER BY id DESC")?;
+        let rows = st.query_map(params![prefix], |r| Ok(ProfileMeta { name: r.get(0)?, version: r.get(1)?, created: r.get(2)? }))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+
+    pub fn get_profile(&self, name: &str, version: i64) -> Result<Option<serde_json::Value>> {
+        let raw: Option<String> = self.conn
+            .query_row("SELECT body FROM profiles WHERE name=?1 AND version=?2", params![name, version], |r| r.get(0))
+            .optional()?;
+        Ok(match raw { Some(s) => Some(serde_json::from_str(&s)?), None => None })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,6 +274,20 @@ mod tests {
     fn baseline_requires_known_device() {
         let s = Store::open_in_memory().unwrap();
         assert!(s.save_baseline_once("unknown", &json!({})).is_err());
+    }
+
+    #[test]
+    fn list_and_get_profiles() {
+        let s = Store::open_in_memory().unwrap();
+        s.save_profile("theme:Living room", &json!({"a": 1})).unwrap();
+        s.save_profile("theme:Living room", &json!({"a": 2})).unwrap();
+        s.save_profile("deploy:x", &json!({})).unwrap();
+        let l = s.list_profiles("theme:").unwrap();
+        assert_eq!(l.iter().map(|p| p.version).collect::<Vec<_>>(), vec![2, 1]);
+        assert_eq!(s.get_profile("theme:Living room", 1).unwrap(), Some(json!({"a": 1})));
+        assert_eq!(s.get_profile("theme:Living room", 9).unwrap(), None);
+        // A prefix with LIKE wildcards matches literally.
+        assert!(s.list_profiles("theme%").unwrap().is_empty());
     }
 
     #[test]

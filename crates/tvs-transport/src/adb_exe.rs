@@ -116,7 +116,7 @@ impl Transport for AdbExeTransport {
 
     fn shell(&self, serial: &Serial, cmd: &ShellCommand) -> Result<ShellOutput> {
         let mut args: Vec<&str> = vec!["-s", serial.as_str(), "shell"];
-        args.extend(cmd.tokens().iter().map(String::as_str));
+        args.extend(cmd.adb_args());
         Self::check(self.run(&args, self.timeout)?)
     }
 

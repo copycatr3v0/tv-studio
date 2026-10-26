@@ -15,6 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - uses: dtolnay/rust-toolchain@stable
+        with: { components: clippy }
       - uses: Swatinem/rust-cache@v2
       - name: System libraries for Tauri
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev
@@ -25,8 +26,43 @@ jobs:
       - run: cargo test --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
+  launcher:
+    runs-on: ubuntu-24.04
+    env:
+      HAS_RELEASE_KEY: ${{ secrets.STUDIO_KEYSTORE_B64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Optional release key
+        if: env.HAS_RELEASE_KEY == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.STUDIO_KEYSTORE_B64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/studio.jks" && echo "STUDIO_KEYSTORE=$RUNNER_TEMP/studio.jks" >> "$GITHUB_ENV"
+      - name: Test, lint and build
+        working-directory: launcher
+        env:
+          STUDIO_KEYSTORE_PASSWORD: ${{ secrets.STUDIO_KEYSTORE_PASSWORD }}
+          STUDIO_KEY_ALIAS: ${{ secrets.STUDIO_KEY_ALIAS }}
+          STUDIO_KEY_PASSWORD: ${{ secrets.STUDIO_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease
+      - name: APK size gate (576 KB, as upstream)
+        run: |
+          size=$(stat -c %s launcher/app/build/outputs/apk/release/app-release.apk)
+          echo "APK size: $size bytes"
+          test "$size" -lt 589824
+      - name: Package name check
+        run: |
+          aapt=$(ls $ANDROID_HOME/build-tools/34.0.0/aapt)
+          $aapt dump badging launcher/app/build/outputs/apk/release/app-release.apk | grep "package: name='studio.tvcustomizer.home'"
+      - run: cp launcher/app/build/outputs/apk/release/app-release.apk studio-home.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: studio-home-apk, path: studio-home.apk, if-no-files-found: error }
+
   windows:
-    needs: test
+    needs: [test, launcher]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +72,8 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with: { name: studio-home-apk, path: src-tauri/resources/launcher }
       - run: pnpm install --frozen-lockfile
       - run: cargo test --workspace --locked
       - name: Build installer and portable exe

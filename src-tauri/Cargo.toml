@@ -24,3 +24,8 @@ tvs-store.workspace = true
 tvs-device.workspace = true
 tvs-kb.workspace = true
 tvs-recovery.workspace = true
+tvs-launcher.workspace = true
+base64 = "0.22"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }

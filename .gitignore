@@ -11,3 +11,6 @@ adbkey*
 *.keystore
 *.jks
 .sync/
+src-tauri/resources/launcher/*.apk
+launcher/app/build/
+launcher/.gradle/

@@ -118,7 +118,7 @@ export const RestorePlan = z.object({
   set_home: z.string().nullable(), settings: z.array(z.tuple([z.string(), z.string().nullable()])),
 });
 export type RestorePlan = z.infer<typeof RestorePlan>;
-export const RestorePreview = z.object({ plan: RestorePlan, baseline_created: z.string() });
+export const RestorePreview = z.object({ plan: RestorePlan, baseline_created: z.string(), studio_launcher: z.boolean() });
 export type RestorePreview = z.infer<typeof RestorePreview>;
 
 export const Progress = z.discriminatedUnion("kind", [
@@ -126,6 +126,25 @@ export const Progress = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("verified"), batch: z.number(), batches: z.number() }),
 ]);
 export type Progress = z.infer<typeof Progress>;
+
+export const LauncherStatus = z.object({
+  installed: z.boolean(), enabled: z.boolean(), version: z.string().nullable(),
+  resolved_home: z.string().nullable(), is_resolved_home: z.boolean(),
+});
+export type LauncherStatus = z.infer<typeof LauncherStatus>;
+export const LauncherInfo = z.object({ status: LauncherStatus, apk_bundled: z.boolean(), schema_launcher_version: z.string(), focused: z.string().nullable() });
+export type LauncherInfo = z.infer<typeof LauncherInfo>;
+export const HomeCheck = z.object({ resolved: z.string().nullable(), focused: z.string().nullable(), verified: z.boolean(), note: z.string().nullable() });
+export type HomeCheck = z.infer<typeof HomeCheck>;
+export const ThemeIssue = z.object({ level: z.enum(["error", "warning"]), key: z.string(), message: z.string() });
+export type ThemeIssue = z.infer<typeof ThemeIssue>;
+export const ThemeReport = z.object({
+  written: z.array(z.tuple([z.string(), z.enum(["provider", "copy"])])), config_verified: z.boolean(),
+  restarted: z.boolean(), focused_after: z.string().nullable(),
+});
+export type ThemeReport = z.infer<typeof ThemeReport>;
+export const SavedTheme = z.object({ name: z.string(), version: z.number().int(), created: z.string() });
+export type SavedTheme = z.infer<typeof SavedTheme>;
 
 export const CmdError = z.object({
   kind: z.enum(["store", "transport", "invalid"]),
@@ -188,6 +207,17 @@ export const api = {
     call("apply_debloat", ApplyResult, { request: { serial, packages, confirmed } }),
   restorePreview: (serial: string, scope: string[] | null) => call("restore_preview", RestorePreview, { serial, scope }),
   baselineStatus: (serial: string) => call("baseline_status", z.object({ identity: z.string(), created: z.string().nullable() }), { serial }),
+  launchableApps: (serial: string) => call("launchable_apps", z.array(z.string()), { serial }),
+  launcherStatus: (serial: string) => call("launcher_status", LauncherInfo, { serial }),
+  installLauncher: (serial: string) => call("install_launcher", LauncherStatus, { serial }),
+  makeLauncherHome: (serial: string) => call("make_launcher_home", HomeCheck, { serial }),
+  importTheme: (jsonText: string) => call("import_theme", z.object({ config: z.record(z.unknown()), issues: z.array(ThemeIssue) }), { jsonText }),
+  deployTheme: (serial: string, theme: { config: Record<string, unknown>; wallpapers: { name: string; data_base64: string }[]; captions: string | null }) =>
+    call("deploy_theme", ThemeReport, { serial, theme }),
+  resetTheme: (serial: string) => call("reset_theme", ThemeReport, { serial }),
+  saveThemeVersion: (name: string, theme: unknown) => call("save_theme_version", z.number().int(), { name, theme }),
+  listThemeVersions: () => call("list_theme_versions", z.array(SavedTheme)),
+  loadThemeVersion: (name: string, version: number) => call("load_theme_version", z.unknown(), { name, version }),
   restoreApply: (serial: string, scope: string[] | null) => call("restore_apply", ChangeReport, { serial, scope }),
 };
 

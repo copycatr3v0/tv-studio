@@ -100,26 +100,29 @@ pub async fn apply_debloat(app: tauri::AppHandle, request: ApplyRequest) -> CmdR
         if !problems.is_empty() {
             return Err(CmdError::Invalid(format!("Nothing was changed. {}", problems.join(" | "))));
         }
-        let identity = tvs_device::probe::quick_identity(&t, &serial)
-            .ok_or_else(|| CmdError::Invalid("Could not read the TV's identity, so no snapshot could be saved. Nothing was changed.".into()))?;
-        let now = now_iso();
-        let snap = capture(&t, &serial, &identity, &now)?;
-        let body = serde_json::to_value(&snap).map_err(|e| CmdError::Invalid(e.to_string()))?;
-        let baseline_created = {
-            let st = app2.state::<AppState>();
-            let store = st.store.lock().unwrap();
-            store.upsert_device(&identity, serial.as_str(), None, None, None)?;
-            let created = store.save_baseline_once(&identity, &body)?;
-            store.save_snapshot(&identity, "pre_deploy", &body)?;
-            created
-        };
+        let (identity, baseline_created) = ensure_baseline(&app2, &t, &serial)?;
         let report = disable_in_batches(&t, &serial, &sel, batch, &mut |p| { let _ = app2.emit("debloat-progress", &p); });
         Ok(ApplyResult { report, baseline_created, identity })
     }).await
 }
 
+/// Record the TV's state before any change this app makes: the baseline (first one ever, never
+/// replaced) and a pre-change snapshot. Fails, and the caller changes nothing, if the TV can't be read.
+pub(crate) fn ensure_baseline(app: &tauri::AppHandle, t: &dyn tvs_transport::Transport, serial: &tvs_core::Serial) -> CmdResult<(String, bool)> {
+    let identity = tvs_device::probe::quick_identity(t, serial)
+        .ok_or_else(|| CmdError::Invalid("Could not read the TV's identity, so no snapshot could be saved. Nothing was changed.".into()))?;
+    let snap = capture(t, serial, &identity, &now_iso())?;
+    let body = serde_json::to_value(&snap).map_err(|e| CmdError::Invalid(e.to_string()))?;
+    let st = app.state::<AppState>();
+    let store = st.store.lock().unwrap();
+    store.upsert_device(&identity, serial.as_str(), None, None, None)?;
+    let created = store.save_baseline_once(&identity, &body)?;
+    store.save_snapshot(&identity, "pre_deploy", &body)?;
+    Ok((identity, created))
+}
+
 #[derive(Debug, Serialize)]
-pub struct RestorePreview { plan: RestorePlan, baseline_created: String }
+pub struct RestorePreview { plan: RestorePlan, baseline_created: String, studio_launcher: bool }
 
 fn load_baseline(app: &tauri::AppHandle, identity: &str) -> CmdResult<Snapshot> {
     let v = app.state::<AppState>().store.lock().unwrap().baseline(identity)?
@@ -166,7 +169,8 @@ pub async fn restore_preview(app: tauri::AppHandle, serial: String, scope: Optio
     let app2 = app.clone();
     blocking(move || {
         let (snap, plan) = preview(&app2, &t, &serial, scope.as_deref())?;
-        Ok(RestorePreview { plan, baseline_created: snap.created })
+        let studio_launcher = scope.is_none() && tvs_launcher::install::status(&t, &serial).map(|s| s.installed).unwrap_or(false);
+        Ok(RestorePreview { plan, baseline_created: snap.created, studio_launcher })
     }).await
 }
 
@@ -177,12 +181,18 @@ pub async fn restore_apply(app: tauri::AppHandle, serial: String, scope: Option<
     let batch = app.state::<AppState>().store.lock().unwrap().settings()?.batch_size as usize;
     let app2 = app.clone();
     blocking(move || {
-        let (_, plan) = preview(&app2, &t, &serial, scope.as_deref())?;
-        Ok(apply_restore(&t, &serial, &plan, batch, &mut |p| { let _ = app2.emit("debloat-progress", &p); }))
+        let (snap, plan) = preview(&app2, &t, &serial, scope.as_deref())?;
+        let mut report = apply_restore(&t, &serial, &plan, batch, &mut |p| { let _ = app2.emit("debloat-progress", &p); });
+        if scope.is_none() && report.stopped.is_none() {
+            let (changed, kept) = tvs_launcher::revert::remove_studio_launcher(&t, &serial, snap.home.as_deref(), std::time::Duration::from_millis(1500));
+            report.changed.extend(changed);
+            report.unchanged.extend(kept);
+        }
+        Ok(report)
     }).await
 }
 
-fn now_iso() -> String {
+pub(crate) fn now_iso() -> String {
     // Seconds since the epoch, formatted as UTC without pulling in a date crate.
     let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let (days, rem) = (secs / 86_400, secs % 86_400);

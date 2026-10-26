@@ -12,11 +12,12 @@ use tvs_device::{advice, probe_port, DeviceInfo, Endpoint, PortState, DEFAULT_PO
 use tvs_transport::{find_adb, AdbExeTransport, DeviceEntry, DeviceState, MdnsService, PairingCode, Transport, TransportError};
 
 mod debloat;
+mod launcher_cmds;
 
 pub struct AppState {
     pub(crate) store: Mutex<Store>,
     db_path: PathBuf,
-    resource_dir: Option<PathBuf>,
+    pub(crate) resource_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize)]
@@ -182,7 +183,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_info, get_settings, save_settings, list_devices, diagnose, connect_tv, pair_tv,
             discover_wireless, disconnect_tv, probe_device, debloat::inventory, debloat::evaluate_debloat,
-            debloat::apply_debloat, debloat::restore_preview, debloat::restore_apply, debloat::baseline_status
+            debloat::apply_debloat, debloat::restore_preview, debloat::restore_apply, debloat::baseline_status,
+            launcher_cmds::launcher_status, launcher_cmds::install_launcher, launcher_cmds::make_launcher_home,
+            launcher_cmds::validate_theme, launcher_cmds::import_theme, launcher_cmds::deploy_theme, launcher_cmds::reset_theme,
+            launcher_cmds::save_theme_version, launcher_cmds::list_theme_versions, launcher_cmds::load_theme_version, launcher_cmds::launchable_apps
         ])
         .run(tauri::generate_context!())
         .expect("error while running Android TV Customizer Studio");

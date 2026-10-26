@@ -103,7 +103,7 @@ describe("Revert to original", () => {
     invoke.mockImplementation(async (cmd: string) => {
       if (cmd === "list_devices") return [{ serial: "tv:5555", state: "device", model: "Smart TV Pro", product: null }];
       if (cmd === "baseline_status") return { identity: "id", created: "2026-10-26T10:00:00Z" };
-      if (cmd === "restore_preview") return { baseline_created: "2026-10-26T10:00:00Z", plan: { enable: [], left_disabled: [], not_in_snapshot: [], set_home: null, settings: [] } };
+      if (cmd === "restore_preview") return { baseline_created: "2026-10-26T10:00:00Z", studio_launcher: false, plan: { enable: [], left_disabled: [], not_in_snapshot: [], set_home: null, settings: [] } };
       throw new Error(cmd);
     });
     render(<RevertButton serial="tv:5555" onSelect={() => {}} />);
@@ -118,7 +118,7 @@ describe("Revert to original", () => {
     invoke.mockImplementation(async (cmd: string) => {
       if (cmd === "list_devices") return [];
       if (cmd === "baseline_status") return { identity: "id", created: "2026-10-26T10:00:00Z" };
-      if (cmd === "restore_preview") return { baseline_created: "2026-10-26T10:00:00Z", plan: { enable: ["com.tcl.logkit"], left_disabled: ["com.tcl.off"], not_in_snapshot: [], set_home: null, settings: [["window_animation_scale", "0.5"]] } };
+      if (cmd === "restore_preview") return { baseline_created: "2026-10-26T10:00:00Z", studio_launcher: false, plan: { enable: ["com.tcl.logkit"], left_disabled: ["com.tcl.off"], not_in_snapshot: [], set_home: null, settings: [["window_animation_scale", "0.5"]] } };
       if (cmd === "restore_apply") return { changed: ["com.tcl.logkit", "window_animation_scale"], refused: [], unchanged: [], skipped: [], stopped: null };
       throw new Error(cmd);
     });

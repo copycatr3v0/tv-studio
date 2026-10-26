@@ -7,7 +7,7 @@ mod command;
 pub mod mock;
 
 pub use adb_exe::{find_adb, AdbExeTransport};
-pub use command::{CommandError, ShellCommand};
+pub use command::{is_staging_path, CommandError, ShellCommand, STAGING_PREFIX};
 
 use serde::Serialize;
 use std::path::Path;

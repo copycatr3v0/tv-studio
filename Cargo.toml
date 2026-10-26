@@ -23,8 +23,17 @@ tvs-store = { path = "crates/tvs-store" }
 tvs-device = { path = "crates/tvs-device" }
 tvs-kb = { path = "crates/tvs-kb" }
 tvs-recovery = { path = "crates/tvs-recovery" }
+tvs-launcher = { path = "crates/tvs-launcher" }
 
 [profile.release]
 lto = true
 codegen-units = 1
 strip = true
+
+# Image resizing is unusably slow unoptimized; keep it fast in debug builds and tests.
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.zune-jpeg]
+opt-level = 3

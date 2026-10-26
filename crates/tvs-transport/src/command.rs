@@ -13,16 +13,21 @@ pub enum CommandError {
 /// Characters that would let a token chain, pipe, substitute or redirect in the TV's shell.
 const FORBIDDEN: &[char] = &[';', '&', '|', '`', '$', '>', '<', '\n', '\r', '(', ')', '\'', '"', '\\', '*', '?', '{', '}', '#', '~', '!'];
 
+/// Staged files this app writes on the TV live here and nowhere else.
+pub const STAGING_PREFIX: &str = "/data/local/tmp/tvs-";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShellCommand {
     tokens: Vec<String>,
+    /// Optional `< file` redirect, only ever a validated staging path.
+    stdin: Option<String>,
 }
 
 impl ShellCommand {
     /// Program name, e.g. `pm`, `settings`, `dumpsys`. Must be a plain word.
     pub fn new(program: &'static str) -> Self {
         assert!(Self::safe(program) && !program.is_empty(), "unsafe program name {program:?}");
-        Self { tokens: vec![program.to_string()] }
+        Self { tokens: vec![program.to_string()], stdin: None }
     }
 
     /// A fixed token written in source code. Panics on shell syntax (a programming error).
@@ -56,14 +61,39 @@ impl ShellCommand {
         Ok(self)
     }
 
+    /// Feed a staged file on the TV to the command's stdin (`content write` needs this). Only paths under
+    /// `/data/local/tmp/tvs-` made of `[A-Za-z0-9_.-]` are accepted.
+    pub fn stdin_from(mut self, staged: &str) -> Result<Self, CommandError> {
+        if !is_staging_path(staged) { return Err(CommandError::UnsafeToken(staged.to_string())); }
+        self.stdin = Some(staged.to_string());
+        Ok(self)
+    }
+
+    pub fn stdin(&self) -> Option<&str> { self.stdin.as_deref() }
+
     fn safe(t: &str) -> bool { !t.chars().any(|c| FORBIDDEN.contains(&c)) }
 
     pub fn tokens(&self) -> &[String] { &self.tokens }
 
     /// The command line as sent to `adb shell`.
-    pub fn to_shell_string(&self) -> String { self.tokens.join(" ") }
+    pub fn to_shell_string(&self) -> String {
+        match &self.stdin { Some(f) => format!("{} < {f}", self.tokens.join(" ")), None => self.tokens.join(" ") }
+    }
+
+    /// Arguments for `adb shell` (the redirect is interpreted by the TV's shell).
+    pub fn adb_args(&self) -> Vec<&str> {
+        let mut v: Vec<&str> = self.tokens.iter().map(String::as_str).collect();
+        if let Some(f) = &self.stdin { v.push("<"); v.push(f); }
+        v
+    }
 
     pub fn program(&self) -> &str { &self.tokens[0] }
+}
+
+pub fn is_staging_path(p: &str) -> bool {
+    p.strip_prefix(STAGING_PREFIX).is_some_and(|rest| {
+        !rest.is_empty() && !rest.contains("..") && rest.chars().all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c))
+    })
 }
 
 #[cfg(test)]
@@ -81,6 +111,16 @@ mod tests {
     #[should_panic]
     fn rejects_chaining_in_static() {
         let _ = ShellCommand::new("pm").arg("list; reboot");
+    }
+
+    #[test]
+    fn stdin_only_from_staging() {
+        let c = ShellCommand::new("content").arg("write").stdin_from("/data/local/tmp/tvs-theme-config.json").unwrap();
+        assert_eq!(c.to_shell_string(), "content write < /data/local/tmp/tvs-theme-config.json");
+        assert_eq!(c.adb_args(), vec!["content", "write", "<", "/data/local/tmp/tvs-theme-config.json"]);
+        for bad in ["/sdcard/x", "/data/local/tmp/other", "/data/local/tmp/tvs-a/../b", "/data/local/tmp/tvs-a;b", "/data/local/tmp/tvs-", "/data/local/tmp/tvs-a b"] {
+            assert!(ShellCommand::new("content").stdin_from(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

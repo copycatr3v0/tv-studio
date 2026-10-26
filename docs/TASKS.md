@@ -36,7 +36,20 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [x] "Revert to original" button in the app header + Restore page, with a baseline-status check (3 UI tests)
 - [ ] Real-device round trip on a Google TV and an Android TV (mock-only so far)
 
-## M6 Launcher fork + theme system (next)
+## M6 Launcher fork + theme system
+- [x] Fork CleanYourTV launcher as `studio.tvcustomizer.home` via its own `launcherApplicationId` mechanism (Java namespace unchanged; NOTICE + licence kept)
+- [x] CI job: Gradle unit tests, lint, release build, 576 KB size gate, package-name check; APK bundled into the Windows installer
+- [ ] First green launcher CI run (needs the GitHub push) — not compiled locally: no Android SDK reachable from this workspace
+- [x] Theme schema v1 generated from CleanYourTV docs + built-in config.xml defaults (106 keys), shared by Rust and the UI
+- [x] Rust validator, CleanYourTV import (keeps valid keys, reports dropped ones), remote-button keys refused until helpers are supported
+- [x] Wallpaper intake: decode + re-encode to JPEG ≤1920×1080 (strips payloads), safe names
+- [x] Theme delivery: staging → ThemeProvider `content write` → `cp` fallback → read-back verify → restart Home only if it is Home (13 tests)
+- [x] Launcher install (pm install -r, typed refusals), Home handover verified on screen, hand-back, uninstall
+- [x] Revert to original extended: Home handed back and confirmed before the launcher is uninstalled; kept if it can't be confirmed (round-trip test)
+- [x] 15 original themes + original procedural wallpapers (`tools/make_wallpapers.py`)
+- [x] Live Theme Editor: 16:9 preview from the same keys, D-pad simulation, schema-driven controls, undo/redo, import/export, saved versions, wallpaper upload
+- [x] Apply-to-TV flow (install → Home → theme, each verified) and Launcher Builder page (8 UI tests)
+- [ ] Real-TV checks: preview vs. TV screenshot for 3 themes; theme push on Android 9 and on 12+
 
 ## M7–M10
 See PLAN.md. Tasks get broken down when each milestone starts.

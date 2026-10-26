@@ -75,6 +75,14 @@ pub fn setupwraith_owns_wifi(dumpsys_wifi: &str) -> Option<bool> {
     if owners.is_empty() { None } else { Some(owners.iter().any(|o| o.contains("setupwraith"))) }
 }
 
+/// Packages with a TV (LEANBACK_LAUNCHER) entry, in the TV's order: what a launcher can show as tiles.
+pub fn launchable_packages(t: &dyn Transport, serial: &Serial) -> Result<Vec<String>, InventoryError> {
+    let out = run_ok(t, serial, &ShellCommand::new("cmd").arg("package").arg("query-activities").arg("--brief")
+        .arg("-a").arg("android.intent.action.MAIN").arg("-c").arg("android.intent.category.LEANBACK_LAUNCHER"))?;
+    let mut seen = BTreeSet::new();
+    Ok(components(&out).into_iter().map(|c| c.package().to_string()).filter(|p| seen.insert(p.clone())).collect())
+}
+
 /// Current default Home component, if a single one is set.
 pub fn current_home(t: &dyn Transport, serial: &Serial) -> Option<String> {
     let cmd = ShellCommand::new("cmd").arg("package").arg("resolve-activity").arg("--brief")

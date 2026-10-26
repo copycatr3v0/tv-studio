@@ -175,3 +175,14 @@ fn failed_dumpsys_fails_closed() {
     assert!(!f.input_hardware_checked);
     assert!(matches!(tvs_safety::evaluate_selection(&sel, &f)[&sel[0]], tvs_safety::Verdict::Blocked(_)));
 }
+
+#[test]
+fn launchable_apps_dedupe_in_order() {
+    let m = MockTransport::new();
+    let mut d = google_tv();
+    d.activity_queries.insert("android.intent.action.MAIN".into(), vec![
+        "com.netflix.ninja/.MainActivity".into(), "com.google.android.youtube.tv/.Shell".into(), "com.netflix.ninja/.Other".into(),
+    ]);
+    m.add_device("tv:5555", d);
+    assert_eq!(crate::inventory::launchable_packages(&m, &s("tv:5555")).unwrap(), vec!["com.netflix.ninja", "com.google.android.youtube.tv"]);
+}

@@ -11,15 +11,20 @@ import { DebloatPage } from "./pages/DebloatPage";
 import { RestorePage } from "./pages/RestorePage";
 import { ErrorNote } from "./components/ui";
 import { RevertButton } from "./components/Revert";
+import { ThemesPage } from "./pages/ThemesPage";
+import { EditorPage } from "./pages/EditorPage";
+import { LauncherPage } from "./pages/LauncherPage";
+import { useThemeEditor } from "./theme/useThemeEditor";
 
 const GROUPS = ["Device", "Design", "Clean up", "Apply", "App"] as const;
-const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore"]);
+const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore", "themes", "editor", "launcher"]);
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [active, setActive] = useState<SectionId>("dashboard");
   const [serial, setSerial] = useState<string | null>(null);
+  const editor = useThemeEditor();
 
   useEffect(() => {
     api.getSettings().then(setSettings, (e: unknown) => setLoadErr(e instanceof IpcError ? e.message : String(e)));
@@ -90,6 +95,9 @@ export function App() {
           {current.id === "apps" && <ApplicationsPage serial={serial} onSelect={setSerial} />}
           {current.id === "debloat" && <DebloatPage serial={serial} onSelect={setSerial} />}
           {current.id === "restore" && <RestorePage serial={serial} onSelect={setSerial} />}
+          {current.id === "themes" && <ThemesPage serial={serial} editor={editor} onEdit={() => setActive("editor")} />}
+          {current.id === "editor" && <EditorPage serial={serial} editor={editor} advanced={mode === "advanced"} />}
+          {current.id === "launcher" && <LauncherPage serial={serial} onSelect={setSerial} />}
           {!BUILT.has(current.id) && <Planned section={current} />}
         </div>
       </main>
