@@ -1,4 +1,4 @@
-// Fifteen original starting points. Configs only use keys the launcher supports; wallpapers are this
+// Twenty-five original starting points. Configs only use keys the launcher supports; wallpapers are this
 // project's own procedural art (tools/make_wallpapers.py).
 import type { ThemeConfig } from "./schema";
 
@@ -40,6 +40,26 @@ export const CATALOG: readonly CatalogTheme[] = [
     config: { background_color: "#1A2224", wallpaper: true, dock_opacity: 70, glass_style: "rim" } },
   { id: "gradient-modern", name: "Gradient Modern", blurb: "A bold coral-to-violet-to-teal sweep.", wallpaper: "gradient-modern.jpg",
     config: { background_color: "#3A2470", wallpaper: true, dock_glass: true, wallpaper_dim: 20 } },
+  { id: "sunset-dunes", name: "Sunset Dunes", blurb: "Warm desert ridges under a low sun. Soft glass highlight.", wallpaper: "sunset-dunes.jpg",
+    config: { background_color: "#2A1430", wallpaper: true, glass_style: "glass", dock_opacity: 65, wallpaper_dim: 10 } },
+  { id: "ocean-deep", name: "Ocean Deep", blurb: "Light shafts through deep blue water, with a cool halo focus.", wallpaper: "ocean-deep.jpg",
+    config: { background_color: "#020C1C", wallpaper: true, glass_style: "halo", dock_glass: true } },
+  { id: "midnight-city", name: "Midnight City", blurb: "A lit skyline at night. Neon-pink haze, rim focus, names always shown.", wallpaper: "midnight-city.jpg",
+    config: { background_color: "#0E0C28", wallpaper: true, glass_style: "rim", always_show_names: true, dock_opacity: 75 } },
+  { id: "forest-mist", name: "Forest Mist", blurb: "Layered pine ridges in morning fog. Calm and low contrast.", wallpaper: "forest-mist.jpg",
+    config: { background_color: "#0C2620", wallpaper: true, glass_style: "rim", uniform_tiles: true, wallpaper_dim: 15 } },
+  { id: "sakura", name: "Sakura", blurb: "Soft pink petals, big friendly tiles and calm motion.", wallpaper: "sakura.jpg",
+    config: { background_color: "#F2C4D4", wallpaper: true, columns: 4, always_show_names: true, reduced_motion: true, dock_glass: true } },
+  { id: "space-nebula", name: "Space Nebula", blurb: "Violet and blue gas clouds with a field of stars. App-coloured glow.", wallpaper: "space-nebula.jpg",
+    config: { background_color: "#06040F", wallpaper: true, glass_style: "halo", app_glow: true, dock_opacity: 60 } },
+  { id: "ember", name: "Ember", blurb: "Dark with a low orange glow and drifting sparks. Warm and cosy.", wallpaper: "ember.jpg",
+    config: { background_color: "#0C0605", wallpaper: true, glass_style: "rim", ambient_glow: false, header_white: true } },
+  { id: "arctic", name: "Arctic", blurb: "A light theme: pale ice-blue ridges and a frosted dock. Good in bright rooms.", wallpaper: "arctic.jpg",
+    config: { background_color: "#B7CFE3", wallpaper: true, dock_glass: true, glass_style: "glass", always_show_names: true } },
+  { id: "retro-terminal", name: "Retro Terminal", blurb: "Phosphor-green code rain on black. Uniform tiles, no frills.", wallpaper: "retro-terminal.jpg",
+    config: { background_color: "#020A04", wallpaper: true, uniform_tiles: true, glass_style: "rim", ambient_glow: false, columns: 6 } },
+  { id: "kids-bright", name: "Kids Bright", blurb: "Primary colours, four big tiles per row, every name shown, gentle motion.", wallpaper: "kids-bright.jpg",
+    config: { background_color: "#7CC8FF", wallpaper: true, columns: 4, always_show_names: true, reduced_motion: true, uniform_tiles: true } },
   { id: "blank", name: "Custom Blank", blurb: "The launcher's built-in defaults. Start from scratch.", wallpaper: null,
     config: {} },
 ];

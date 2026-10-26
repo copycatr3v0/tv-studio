@@ -89,7 +89,7 @@ These move into our Rust `safety` and `planner` modules as **non-overridable cod
 | `examples/*/debloat.txt` | **Import as data** into a bundled package knowledge base (name, reason, category, device evidence) | Gives device-specific risk evidence instead of name guessing. Comments are MIT text and must be attributed. |
 | `privacy.py` catalogue | **Port the data and evidence model** | |
 | `bench.py` methodology | **Reimplement** (framestats completion-time matching, `am start -W`, PSS, idle CPU, series and spread) | |
-| Themes and wallpapers | **Do not reuse the assets.** Write our own 15 themes. | Wallpapers are CC BY / CC BY-SA from Wikimedia, not MIT. Outfit font is OFL, which can be bundled with its licence file. |
+| Themes and wallpapers | **Do not reuse the assets.** Write our own themes (15 at M6, 25 now). | Wallpapers are CC BY / CC BY-SA from Wikimedia, not MIT. Outfit font is OFL, which can be bundled with its licence file. |
 | Add-ons | **Keep the module-card contract** for compatibility; build our own modules later | |
 
 ## 5. Architecture risks and choices found

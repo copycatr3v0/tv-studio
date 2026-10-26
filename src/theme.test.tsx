@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 
@@ -18,6 +19,8 @@ beforeEach(() => {
   invoke.mockReset();
 });
 
+const SHIPPED = import.meta.glob("/public/themes/*.jpg", { query: "?url", eager: false });
+
 describe("theme schema", () => {
   it("is the generated v1 schema with CleanYourTV's core keys", () => {
     const keys = SCHEMA.keys.map((k) => k.key);
@@ -31,10 +34,12 @@ describe("theme schema", () => {
     expect(Object.keys(p).sort()).toEqual(["app_keys", "background_color", "columns", "dock_apps", "glass_style", "greeting_name", "made_up"]);
   });
 
-  it("ships 15 original themes that all validate", () => {
-    expect(CATALOG).toHaveLength(15);
-    expect(new Set(CATALOG.map((t) => t.id)).size).toBe(15);
+  it("ships 25 original themes that all validate", () => {
+    expect(CATALOG).toHaveLength(25);
+    expect(new Set(CATALOG.map((t) => t.id)).size).toBe(25);
     for (const t of CATALOG) expect(validate(t.config), t.id).toEqual({});
+    // Every wallpaper a theme names is shipped with the app.
+    for (const t of CATALOG.filter((x) => x.wallpaper)) expect(Object.keys(SHIPPED), t.id).toContain(`/public/themes/${t.wallpaper}`);
   });
 });
 

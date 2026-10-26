@@ -46,7 +46,7 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [x] Theme delivery: staging → ThemeProvider `content write` → `cp` fallback → read-back verify → restart Home only if it is Home (13 tests)
 - [x] Launcher install (pm install -r, typed refusals), Home handover verified on screen, hand-back, uninstall
 - [x] Revert to original extended: Home handed back and confirmed before the launcher is uninstalled; kept if it can't be confirmed (round-trip test)
-- [x] 15 original themes + original procedural wallpapers (`tools/make_wallpapers.py`)
+- [x] 15 original themes + original procedural wallpapers (25 after M12: 10 more added) (`tools/make_wallpapers.py`)
 - [x] Live Theme Editor: 16:9 preview from the same keys, D-pad simulation, schema-driven controls, undo/redo, import/export, saved versions, wallpaper upload
 - [x] Apply-to-TV flow (install → Home → theme, each verified) and Launcher Builder page (8 UI tests)
 - [ ] Real-TV checks: preview vs. TV screenshot for 3 themes; theme push on Android 9 and on 12+

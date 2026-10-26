@@ -193,10 +193,181 @@ def material():
     return bottom_shade(img, 0.55)
 
 
+def dunes():
+    img = vgrad((255, 150, 90), (60, 28, 60))
+    img = glow(img, int(W * 0.7), int(H * 0.38), 260, (255, 226, 160), 235, 90)
+    d = ImageDraw.Draw(img)
+    for layer, col in enumerate([(176, 80, 70), (130, 56, 66), (84, 38, 62), (40, 22, 46)]):
+        base = 560 + layer * 120
+        pts = [(0, H)]
+        for x in range(0, W + 20, 20):
+            y = base + 70 * math.sin(x / (380 - layer * 50) + layer * 1.7) + 26 * math.sin(x / 130 + layer)
+            pts.append((x, y))
+        pts.append((W, H))
+        d.polygon(pts, fill=col)
+    return vignette(img, 0.35)
+
+
+def ocean():
+    img = vgrad((10, 70, 120), (2, 12, 34))
+    img = glow(img, int(W * 0.3), int(H * 0.1), 650, (70, 190, 230), 130, 280)
+    shafts = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shafts)
+    for i in range(7):
+        x = 200 + i * 230
+        sd.polygon([(x, 0), (x + 90, 0), (x + 330, H), (x + 120, H)], fill=(150, 230, 255, 26))
+    img = Image.alpha_composite(img.convert("RGBA"), shafts.filter(ImageFilter.GaussianBlur(30))).convert("RGB")
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    for i in range(16):
+        y0 = 300 + i * 48
+        pts = [(x, y0 + 26 * math.sin(x / (170 + i * 11) + i * 0.9)) for x in range(0, W + 12, 12)]
+        d.line(pts, fill=(140, 220, 250, 50 + i * 6), width=4)
+    layer = layer.filter(ImageFilter.GaussianBlur(1.5))
+    img = Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB")
+    return vignette(bottom_shade(img, 0.45), 0.4)
+
+
+def city():
+    img = vgrad((14, 12, 40), (60, 24, 70))
+    img = glow(img, int(W * 0.5), int(H * 0.72), 700, (255, 110, 140), 70, 260)
+    d = ImageDraw.Draw(img)
+    rnd = random.Random(11)
+    for layer, (col, lit) in enumerate([((30, 22, 56), 0.10), ((16, 12, 34), 0.18), ((6, 5, 16), 0.28)]):
+        x = -20
+        while x < W:
+            bw = rnd.randint(70, 170)
+            bh = rnd.randint(160, 420) + layer * 70
+            top = H - bh
+            d.rectangle([x, top, x + bw, H], fill=col)
+            for wy in range(top + 18, H - 20, 26):
+                for wx in range(x + 12, x + bw - 14, 22):
+                    if rnd.random() < lit:
+                        d.rectangle([wx, wy, wx + 8, wy + 12], fill=(255, 214, 140))
+            x += bw + rnd.randint(0, 14)
+    return vignette(img, 0.4)
+
+
+def forest():
+    img = vgrad((200, 222, 208), (30, 62, 52))
+    img = glow(img, int(W * 0.72), int(H * 0.18), 320, (255, 248, 210), 170, 140)
+    rnd = random.Random(5)
+    for layer, col in enumerate([(130, 170, 148), (90, 136, 112), (52, 100, 80), (26, 62, 50), (12, 38, 31)]):
+        d = ImageDraw.Draw(img)
+        base = 420 + layer * 120
+        pts = [(0, H)]
+        for x in range(0, W + 20, 20):
+            pts.append((x, base - 90 * math.sin(x / (330 - layer * 30) + layer * 2.1) - 30 * math.sin(x / 95 + layer)))
+        pts.append((W, H))
+        d.polygon(pts, fill=col)
+        for _ in range(7 + layer * 2):
+            x = rnd.randint(0, W)
+            y = base - 90 * math.sin(x / (330 - layer * 30) + layer * 2.1) - 30 * math.sin(x / 95 + layer)
+            h, w = rnd.randint(90, 150) + layer * 20, 36 + layer * 8
+            d.polygon([(x - w, y + 6), (x, y - h), (x + w, y + 6)], fill=col)
+        fog = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(fog).rectangle([0, base - 60, W, base + 60], fill=(225, 242, 232, 85))
+        img = Image.alpha_composite(img.convert("RGBA"), fog.filter(ImageFilter.GaussianBlur(45))).convert("RGB")
+    return vignette(bottom_shade(img, 0.4), 0.3)
+
+
+def sakura():
+    img = vgrad((255, 226, 232), (236, 170, 196))
+    img = glow(img, int(W * 0.2), int(H * 0.2), 420, (255, 255, 255), 150, 200)
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    rnd = random.Random(8)
+    for _ in range(170):
+        x, y, r = rnd.randint(0, W), rnd.randint(0, H), rnd.randint(8, 26)
+        a = rnd.randint(90, 200)
+        ang = rnd.random() * 3.14
+        for k in range(5):
+            t = ang + k * 6.283 / 5
+            cx, cy = x + math.cos(t) * r * 0.55, y + math.sin(t) * r * 0.55
+            d.ellipse([cx - r * 0.5, cy - r * 0.5, cx + r * 0.5, cy + r * 0.5], fill=(255, 190 + rnd.randint(0, 40), 210, a))
+    layer = layer.filter(ImageFilter.GaussianBlur(1.5))
+    return Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB")
+
+
+def nebula():
+    img = vgrad((8, 6, 22), (2, 2, 10))
+    for cx, cy, r, col, a in [(0.3, 0.4, 560, (120, 60, 220), 150), (0.7, 0.55, 520, (40, 120, 230), 130), (0.55, 0.25, 380, (230, 70, 160), 110)]:
+        img = glow(img, int(W * cx), int(H * cy), r, col, a, 230)
+    d = ImageDraw.Draw(img)
+    rnd = random.Random(21)
+    for _ in range(420):
+        x, y = rnd.randint(0, W), rnd.randint(0, H)
+        c = rnd.randint(150, 255)
+        d.point((x, y), fill=(c, c, 255))
+        if rnd.random() < 0.06:
+            d.ellipse([x - 1, y - 1, x + 1, y + 1], fill=(255, 255, 255))
+    return vignette(img, 0.45)
+
+
+def ember():
+    img = vgrad((10, 6, 6), (46, 14, 6))
+    img = glow(img, int(W * 0.5), int(H * 1.1), 900, (255, 110, 30), 150, 280)
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    rnd = random.Random(2)
+    for _ in range(140):
+        x = rnd.randint(0, W)
+        y = int(H - (rnd.random() ** 1.6) * H * 0.95)
+        r = rnd.randint(1, 4)
+        d.ellipse([x - r, y - r, x + r, y + r], fill=(255, rnd.randint(120, 200), 60, rnd.randint(120, 255)))
+    layer = layer.filter(ImageFilter.GaussianBlur(1.2))
+    return vignette(Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB"), 0.4)
+
+
+def arctic():
+    img = vgrad((232, 242, 250), (150, 190, 220))
+    img = glow(img, int(W * 0.75), int(H * 0.1), 500, (255, 255, 255), 200, 220)
+    d = ImageDraw.Draw(img)
+    for layer, col in enumerate([(200, 222, 240), (170, 202, 228), (132, 172, 208)]):
+        base = 600 + layer * 120
+        pts = [(0, H)]
+        for x in range(0, W + 30, 30):
+            y = base - 150 * abs(math.sin(x / (260 + layer * 40) + layer)) - 40 * math.sin(x / 90)
+            pts.append((x, y))
+        pts.append((W, H))
+        d.polygon(pts, fill=col)
+    return bottom_shade(img, 0.25)
+
+
+def terminal():
+    img = Image.new("RGB", (W, H), (2, 10, 4))
+    img = glow(img, W // 2, H // 2, 800, (20, 120, 50), 70, 300)
+    d = ImageDraw.Draw(img)
+    for y in range(0, H, 4):
+        d.line([(0, y), (W, y)], fill=(0, 0, 0))
+    rnd = random.Random(3)
+    for col in range(0, W, 28):
+        n = rnd.randint(0, 22)
+        top = rnd.randint(0, H)
+        for k in range(n):
+            y = (top + k * 22) % H
+            d.text((col, y), rnd.choice("01ABCDEF"), fill=(20, 90 + k * 6, 40))
+    return vignette(img, 0.5)
+
+
+def kids():
+    img = vgrad((120, 200, 255), (200, 235, 255))
+    d = ImageDraw.Draw(img)
+    for cx, cy, r, col in [(0.12, 0.25, 150, (255, 205, 60)), (0.86, 0.2, 110, (255, 120, 140)), (0.78, 0.8, 170, (110, 220, 150)), (0.2, 0.85, 120, (160, 130, 255)), (0.5, 0.12, 80, (255, 160, 90))]:
+        x, y = int(W * cx), int(H * cy)
+        d.ellipse([x - r, y - r, x + r, y + r], fill=col)
+    for i in range(7):
+        x = 160 + i * 270
+        d.rectangle([x, H - 150, x + 160, H], fill=[(255, 120, 120), (255, 200, 80), (120, 220, 140), (110, 170, 255), (190, 140, 255), (255, 150, 200), (90, 210, 220)][i])
+    return img.filter(ImageFilter.GaussianBlur(2))
+
+
 WALLPAPERS = {
     "cinematic-minimal": cinematic, "premium": premium, "material": material, "cyberpunk-neon": neon,
     "retro-futuristic": synthwave, "frosted-glass": frosted, "aurora": aurora, "luxury-dark": luxury,
     "monochrome": monochrome, "gaming": gaming, "family": family, "nature": nature, "gradient-modern": gradient_modern,
+    "sunset-dunes": dunes, "ocean-deep": ocean, "midnight-city": city, "forest-mist": forest, "sakura": sakura,
+    "space-nebula": nebula, "ember": ember, "arctic": arctic, "retro-terminal": terminal, "kids-bright": kids,
 }
 
 if __name__ == "__main__":

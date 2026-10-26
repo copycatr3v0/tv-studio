@@ -28,7 +28,7 @@ export const SECTIONS: readonly Section[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Device", milestone: "M3", scope: ["app"], summary: "App status and connected TVs." },
   { id: "connect", label: "Connect TV", icon: Cable, group: "Device", milestone: "M4", scope: ["manual", "android"], summary: "Developer options guide, pairing, legacy ADB connect and diagnostics." },
   { id: "inspector", label: "Device Inspector", icon: MonitorSmartphone, group: "Device", milestone: "M4", scope: ["android"], summary: "Model, Android version, fingerprint, RAM, storage, current Home and HOME candidates." },
-  { id: "themes", label: "Themes", icon: Palette, group: "Design", milestone: "M6", scope: ["launcher"], summary: "Fifteen original themes to start from, plus your saved versions." },
+  { id: "themes", label: "Themes", icon: Palette, group: "Design", milestone: "M6", scope: ["launcher"], summary: "Twenty-five original themes to start from, plus your saved versions." },
   { id: "editor", label: "Live Theme Editor", icon: Paintbrush, group: "Design", milestone: "M6", scope: ["launcher"], summary: "Live 16:9 preview with remote-style navigation, every launcher setting, undo/redo, import/export and saved versions." },
   { id: "launcher", label: "Launcher Builder", icon: Boxes, group: "Design", milestone: "M6", scope: ["launcher"], advancedOnly: true, summary: "Install the Studio launcher, make it Home with on-screen confirmation, or reset its look." },
   { id: "apps", label: "Applications", icon: Package, group: "Clean up", milestone: "M5", scope: ["android"], summary: "Every installed package with its real state, type and what tested TVs did with it." },
