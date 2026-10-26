@@ -20,9 +20,12 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 
 ## M4 ADB connectivity
 - [x] Transport trait, AdbExeTransport, MockTransport (scripted states), typed ShellCommand (14 tests)
-- [ ] Discovery, manual IP, pairing, legacy connect, diagnostics
-- [ ] Capability probe + OEM family detection
-- [ ] Connection wizard UI with per-brand guidance
+- [x] Discovery (`adb mdns services`), manual IP, pairing, legacy connect, TCP diagnostics with advice (tvs-device, 11 tests)
+- [x] Capability probe (getprop, meminfo, df, packages, Home + HOME candidates, adb.secure) + OEM family detection; failed queries reported, never guessed
+- [x] Connection wizard UI: per-brand guidance, legacy and pairing tabs, mDNS scan, bounded authorization wait, end-of-session port-closed check
+- [x] Device Inspector UI; device remembered by build identity in SQLite
+- [ ] Bundle adb platform-tools in the installer (licence review first; until then SDK/PATH/custom adb)
+- [ ] Real-device validation on one Google TV and one Android TV (only mock-tested so far)
 
 ## M5 Inventory, safety, snapshot
 - [ ] Import CleanYourTV examples → kb.sqlite (with attribution)

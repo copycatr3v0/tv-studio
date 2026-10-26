@@ -4,14 +4,18 @@ import { api, IpcError, type AppSettings } from "./lib/ipc";
 import { Dashboard } from "./pages/Dashboard";
 import { Planned } from "./pages/Planned";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ConnectPage } from "./pages/ConnectPage";
+import { InspectorPage } from "./pages/InspectorPage";
 import { ErrorNote } from "./components/ui";
 
 const GROUPS = ["Device", "Design", "Clean up", "Apply", "App"] as const;
+const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector"]);
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [active, setActive] = useState<SectionId>("dashboard");
+  const [serial, setSerial] = useState<string | null>(null);
 
   useEffect(() => {
     api.getSettings().then(setSettings, (e: unknown) => setLoadErr(e instanceof IpcError ? e.message : String(e)));
@@ -74,7 +78,9 @@ export function App() {
           {loadErr && <div className="mb-5 max-w-2xl"><ErrorNote message={loadErr} /></div>}
           {current.id === "dashboard" && <Dashboard />}
           {current.id === "settings" && settings && <SettingsPage key={JSON.stringify(settings)} settings={settings} onSaved={setSettings} />}
-          {current.id !== "dashboard" && current.id !== "settings" && <Planned section={current} />}
+          {current.id === "connect" && <ConnectPage onConnected={(s) => { setSerial(s); setActive("inspector"); }} />}
+          {current.id === "inspector" && <InspectorPage serial={serial} onSelect={setSerial} />}
+          {!BUILT.has(current.id) && <Planned section={current} />}
         </div>
       </main>
     </div>

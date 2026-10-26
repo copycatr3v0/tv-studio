@@ -20,6 +20,7 @@ tvs-core = { path = "crates/tvs-core" }
 tvs-transport = { path = "crates/tvs-transport" }
 tvs-safety = { path = "crates/tvs-safety" }
 tvs-store = { path = "crates/tvs-store" }
+tvs-device = { path = "crates/tvs-device" }
 
 [profile.release]
 lto = true

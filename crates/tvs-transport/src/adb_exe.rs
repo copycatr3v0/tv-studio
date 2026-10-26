@@ -1,4 +1,4 @@
-use crate::{classify_error, parse_devices, DeviceEntry, PairingCode, Result, ShellCommand, ShellOutput, Transport, TransportError};
+use crate::{classify_error, parse_devices, parse_mdns, MdnsService, DeviceEntry, PairingCode, Result, ShellCommand, ShellOutput, Transport, TransportError};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -107,6 +107,11 @@ impl Transport for AdbExeTransport {
 
     fn disconnect(&self, endpoint: &Serial) -> Result<()> {
         self.run(&["disconnect", endpoint.as_str()], Duration::from_secs(10)).map(|_| ())
+    }
+
+    fn mdns_services(&self) -> Result<Vec<MdnsService>> {
+        let out = self.run(&["mdns", "services"], Duration::from_secs(10))?;
+        Ok(parse_mdns(&out.stdout))
     }
 
     fn shell(&self, serial: &Serial, cmd: &ShellCommand) -> Result<ShellOutput> {

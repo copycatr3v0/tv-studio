@@ -21,3 +21,4 @@ tvs-core.workspace = true
 tvs-transport.workspace = true
 tvs-safety.workspace = true
 tvs-store.workspace = true
+tvs-device.workspace = true

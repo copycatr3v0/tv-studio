@@ -1,7 +1,7 @@
 //! A scriptable fake TV. It models the state the app reads and changes (packages per user 0, settings,
 //! Home, props) and supports injected failures, so whole workflows can be tested without hardware.
 
-use crate::{DeviceEntry, DeviceState, PairingCode, Result, ShellCommand, ShellOutput, Transport, TransportError};
+use crate::{DeviceEntry, DeviceState, MdnsService, PairingCode, Result, ShellCommand, ShellOutput, Transport, TransportError};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::path::Path;
 use std::sync::Mutex;
@@ -21,6 +21,10 @@ pub struct MockDevice {
     pub home: Option<String>,
     pub home_claimants: Vec<String>,
     pub files: BTreeMap<String, Vec<u8>>,
+    /// Text returned by `cat <path>` (e.g. /proc/meminfo).
+    pub text_files: BTreeMap<String, String>,
+    /// Output of `df /data`.
+    pub df_data: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +38,7 @@ struct Inner {
     /// Endpoints that accept `adb connect`, and the device each one brings online.
     reachable: HashMap<String, MockDevice>,
     pair_codes: HashMap<String, String>,
+    mdns: Vec<MdnsService>,
     /// Errors returned for the next calls whose shell string contains the key.
     failures: VecDeque<(String, Injected)>,
     log: Vec<String>,
@@ -54,6 +59,7 @@ impl MockTransport {
     pub fn set_pair_code(&self, endpoint: &str, code: &str) {
         self.inner.lock().unwrap().pair_codes.insert(endpoint.into(), code.into());
     }
+    pub fn set_mdns(&self, services: Vec<MdnsService>) { self.inner.lock().unwrap().mdns = services; }
     /// The next shell call whose command contains `needle` fails with `err`.
     pub fn fail_next(&self, needle: &str, err: TransportError) {
         self.inner.lock().unwrap().failures.push_back((needle.into(), Injected::Error(err)));
@@ -108,6 +114,8 @@ impl Transport for MockTransport {
         Ok(())
     }
 
+    fn mdns_services(&self) -> Result<Vec<MdnsService>> { Ok(self.inner.lock().unwrap().mdns.clone()) }
+
     fn shell(&self, serial: &Serial, cmd: &ShellCommand) -> Result<ShellOutput> {
         let line = cmd.to_shell_string();
         let mut g = self.inner.lock().unwrap();
@@ -121,6 +129,11 @@ impl Transport for MockTransport {
         let t: Vec<&str> = cmd.tokens().iter().map(String::as_str).collect();
         match t.as_slice() {
             ["getprop"] => ok(dev.props.iter().map(|(k, v)| format!("[{k}]: [{v}]\n")).collect::<String>()),
+            ["cat", path] => match dev.text_files.get(*path) {
+                Some(t) => ok(t.clone()),
+                None => fail(format!("cat: {path}: No such file or directory"), 1),
+            },
+            ["df", "/data"] => match &dev.df_data { Some(t) => ok(t.clone()), None => fail("df: /data: unsupported", 1) },
             ["getprop", key] => ok(format!("{}\n", dev.props.get(*key).cloned().unwrap_or_default())),
             ["pm", "list", "packages", rest @ ..] => {
                 let want = |en: bool| if rest.contains(&"-d") { !en } else if rest.contains(&"-e") { en } else { true };
@@ -210,7 +223,7 @@ mod tests {
         m.add_device("tv:5555", tv());
         let out = m.shell(&s("tv:5555"), &disable("com.tcl.firm")).unwrap();
         assert_ne!(out.code, Some(0));
-        assert_eq!(m.device("tv:5555").unwrap().packages["com.tcl.firm"], true);
+        assert!(m.device("tv:5555").unwrap().packages["com.tcl.firm"]);
     }
 
     #[test]

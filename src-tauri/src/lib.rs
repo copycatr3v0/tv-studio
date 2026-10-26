@@ -6,7 +6,10 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::Manager;
 use tvs_store::{AppSettings, Store};
-use tvs_transport::{find_adb, AdbExeTransport, DeviceEntry, Transport, TransportError};
+use std::time::Duration;
+use tvs_core::Serial;
+use tvs_device::{advice, probe_port, DeviceInfo, Endpoint, PortState, DEFAULT_PORT};
+use tvs_transport::{find_adb, AdbExeTransport, DeviceEntry, DeviceState, MdnsService, PairingCode, Transport, TransportError};
 
 pub struct AppState {
     store: Mutex<Store>,
@@ -22,6 +25,7 @@ pub enum CmdError {
     Invalid(String),
 }
 impl From<tvs_store::StoreError> for CmdError { fn from(e: tvs_store::StoreError) -> Self { CmdError::Store(e.to_string()) } }
+impl From<tvs_device::EndpointError> for CmdError { fn from(e: tvs_device::EndpointError) -> Self { CmdError::Invalid(e.to_string()) } }
 impl From<TransportError> for CmdError { fn from(e: TransportError) -> Self { CmdError::Transport(e) } }
 type CmdResult<T> = Result<T, CmdError>;
 
@@ -83,6 +87,85 @@ async fn list_devices(state: tauri::State<'_, AppState>) -> CmdResult<Vec<Device
         .map_err(CmdError::from)
 }
 
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> CmdResult<T> + Send + 'static) -> CmdResult<T> {
+    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| CmdError::Invalid(e.to_string()))?
+}
+
+fn serial_arg(s: &str) -> CmdResult<Serial> { Serial::new(s).map_err(|e| CmdError::Invalid(e.to_string())) }
+
+#[derive(Debug, Serialize)]
+pub struct Diagnosis { endpoint: String, port_state: PortState, advice: &'static str }
+
+/// Plain TCP check, no adb: tells "wrong IP / asleep" apart from "debugging off" apart from "listening".
+/// Also used at the end of a session to prove the port is closed (only Refused counts).
+#[tauri::command]
+async fn diagnose(address: String) -> CmdResult<Diagnosis> {
+    let ep = Endpoint::parse(&address, DEFAULT_PORT)?;
+    blocking(move || {
+        let st = probe_port(&ep, Duration::from_secs(3));
+        Ok(Diagnosis { endpoint: format!("{}:{}", ep.host, ep.port), advice: advice(&st, ep.port), port_state: st })
+    }).await
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConnectResult { serial: Serial, state: Option<DeviceState>, model: Option<String> }
+
+/// `adb connect`, preceded by a TCP check so a dead address fails in 3 s with advice instead of adb's long timeout.
+#[tauri::command]
+async fn connect_tv(state: tauri::State<'_, AppState>, address: String) -> CmdResult<ConnectResult> {
+    let ep = Endpoint::parse(&address, DEFAULT_PORT)?;
+    let t = transport(&state)?;
+    blocking(move || {
+        let st = probe_port(&ep, Duration::from_secs(3));
+        if st != PortState::Open {
+            return Err(CmdError::Invalid(advice(&st, ep.port).to_string()));
+        }
+        let serial = ep.serial();
+        t.connect(&serial)?;
+        let entry = t.devices()?.into_iter().find(|d| d.serial == serial);
+        Ok(ConnectResult { state: entry.as_ref().map(|d| d.state), model: entry.and_then(|d| d.model), serial })
+    }).await
+}
+
+/// Android 11+ Wireless debugging: pair with the code and pairing port shown on the TV.
+#[tauri::command]
+async fn pair_tv(state: tauri::State<'_, AppState>, address: String, code: String) -> CmdResult<()> {
+    let ep = Endpoint::parse(&address, 0)?;
+    if ep.port == 0 {
+        return Err(CmdError::Invalid("Add the pairing port shown on the TV, e.g. 192.168.1.50:41234".into()));
+    }
+    let code = PairingCode::new(&code).map_err(|e| CmdError::Invalid(e.to_string()))?;
+    let t = transport(&state)?;
+    blocking(move || Ok(t.pair(&ep.serial(), &code)?)).await
+}
+
+#[tauri::command]
+async fn discover_wireless(state: tauri::State<'_, AppState>) -> CmdResult<Vec<MdnsService>> {
+    let t = transport(&state)?;
+    blocking(move || Ok(t.mdns_services()?)).await
+}
+
+#[tauri::command]
+async fn disconnect_tv(state: tauri::State<'_, AppState>, serial: String) -> CmdResult<()> {
+    let serial = serial_arg(&serial)?;
+    let t = transport(&state)?;
+    blocking(move || Ok(t.disconnect(&serial)?)).await
+}
+
+/// Read-only inspection; the device is remembered by its build identity, not its (DHCP) address.
+#[tauri::command]
+async fn probe_device(app: tauri::AppHandle, serial: String) -> CmdResult<DeviceInfo> {
+    let serial = serial_arg(&serial)?;
+    let t = transport(&app.state::<AppState>())?;
+    let info = blocking(move || Ok(tvs_device::probe(&t, &serial))).await?;
+    if info.sdk.is_some() {
+        let st = app.state::<AppState>();
+        let store = st.store.lock().unwrap();
+        store.upsert_device(&info.identity(), info.serial.as_str(), info.brand.as_deref(), info.model.as_deref(), info.sdk.map(i64::from))?;
+    }
+    Ok(info)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -94,7 +177,10 @@ pub fn run() {
             app.manage(AppState { store: Mutex::new(store), db_path, resource_dir });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_info, get_settings, save_settings, list_devices])
+        .invoke_handler(tauri::generate_handler![
+            app_info, get_settings, save_settings, list_devices, diagnose, connect_tv, pair_tv,
+            discover_wireless, disconnect_tv, probe_device
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Android TV Customizer Studio");
 }

@@ -39,6 +39,45 @@ export const DeviceEntry = z.object({
 });
 export type DeviceEntry = z.infer<typeof DeviceEntry>;
 
+export const PortState = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("open") }),
+  z.object({ state: z.literal("refused") }),
+  z.object({ state: z.literal("timeout") }),
+  z.object({ state: z.literal("unreachable"), detail: z.string() }),
+]);
+export const Diagnosis = z.object({ endpoint: z.string(), port_state: PortState, advice: z.string() });
+export type Diagnosis = z.infer<typeof Diagnosis>;
+
+export const ConnectResult = z.object({ serial: z.string(), state: DeviceState.nullable(), model: z.string().nullable() });
+export type ConnectResult = z.infer<typeof ConnectResult>;
+
+export const MdnsService = z.object({ name: z.string(), kind: z.enum(["connect", "pairing", "legacy"]), endpoint: z.string() });
+export type MdnsService = z.infer<typeof MdnsService>;
+
+const opt = <T extends z.ZodTypeAny>(t: T) => t.nullable();
+export const DeviceInfo = z.object({
+  serial: z.string(),
+  fingerprint: opt(z.string()), brand: opt(z.string()), manufacturer: opt(z.string()), model: opt(z.string()),
+  device: opt(z.string()), product: opt(z.string()), android_release: opt(z.string()), sdk: opt(z.number().int()),
+  build_id: opt(z.string()), incremental: opt(z.string()), platform: opt(z.string()), adb_secure: opt(z.boolean()),
+  ram_total_kb: opt(z.number()), ram_available_kb: opt(z.number()), data_total_kb: opt(z.number()), data_free_kb: opt(z.number()),
+  package_count: opt(z.number().int()), disabled_count: opt(z.number().int()),
+  home: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("component"), component: z.string() }),
+    z.object({ kind: z.literal("chooser") }),
+    z.object({ kind: z.literal("unknown") }),
+  ]),
+  home_candidates: z.array(z.object({ component: z.string(), usable: z.boolean() })),
+  oem: z.array(z.object({ family: z.string(), label: z.string(), note: z.string() })),
+  capabilities: z.object({
+    cmd_package: z.boolean(), studio_launcher: z.boolean(), wireless_pairing: z.boolean(),
+    private_dns: z.boolean(), content_write: z.boolean(), install_via_pm: z.boolean(),
+  }),
+  findings: z.array(z.object({ severity: z.enum(["info", "warning", "blocker"]), message: z.string() })),
+  probe_errors: z.array(z.string()),
+});
+export type DeviceInfo = z.infer<typeof DeviceInfo>;
+
 export const CmdError = z.object({
   kind: z.enum(["store", "transport", "invalid"]),
   message: z.unknown(),
@@ -54,6 +93,7 @@ const TRANSPORT_MESSAGES: Record<string, string> = {
   adb_missing: "adb was not found. Reinstall the app, or set a custom adb path in Settings.",
   unauthorized: "The TV has not authorized this computer yet. Accept the “Allow USB debugging?” prompt on the TV.",
   timeout: "The TV did not answer in time.",
+  pairing_failed: "Pairing failed. The code and pairing port change each time the pairing screen opens: check both on the TV and try again.",
 };
 
 function describe(err: unknown): IpcError {
@@ -67,6 +107,8 @@ function describe(err: unknown): IpcError {
   }
   return new IpcError(typeof message === "string" ? message : JSON.stringify(message), kind);
 }
+
+export const errMsg = (e: unknown): string => (e instanceof IpcError ? e.message : String(e));
 
 export const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -85,6 +127,12 @@ export const api = {
   getSettings: () => call("get_settings", AppSettings),
   saveSettings: (settings: AppSettings) => call("save_settings", AppSettings, { settings }),
   listDevices: () => call("list_devices", z.array(DeviceEntry)),
+  diagnose: (address: string) => call("diagnose", Diagnosis, { address }),
+  connect: (address: string) => call("connect_tv", ConnectResult, { address }),
+  pair: (address: string, code: string) => call("pair_tv", z.null(), { address, code }),
+  discover: () => call("discover_wireless", z.array(MdnsService)),
+  disconnect: (serial: string) => call("disconnect_tv", z.null(), { serial }),
+  probe: (serial: string) => call("probe_device", DeviceInfo, { serial }),
 };
 
 export const __test = { describe };

@@ -72,6 +72,8 @@ pub trait Transport: Send + Sync {
     /// Android 11+ wireless debugging pairing (`adb pair host:port code`).
     fn pair(&self, endpoint: &Serial, code: &PairingCode) -> Result<()>;
     fn disconnect(&self, endpoint: &Serial) -> Result<()>;
+    /// Wireless-debugging services advertised on the LAN (`adb mdns services`).
+    fn mdns_services(&self) -> Result<Vec<MdnsService>>;
     fn shell(&self, serial: &Serial, cmd: &ShellCommand) -> Result<ShellOutput>;
     fn push(&self, serial: &Serial, local: &Path, remote: &str) -> Result<()>;
     fn pull(&self, serial: &Serial, remote: &str, local: &Path) -> Result<()>;
@@ -91,6 +93,35 @@ impl PairingCode {
         }
     }
     pub fn as_str(&self) -> &str { &self.0 }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MdnsKind { Connect, Pairing, Legacy }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct MdnsService {
+    pub name: String,
+    pub kind: MdnsKind,
+    pub endpoint: Serial,
+}
+
+/// Parse `adb mdns services` output (tab- or space-separated: name, service type, host:port).
+pub fn parse_mdns(out: &str) -> Vec<MdnsService> {
+    out.lines()
+        .filter(|l| !l.starts_with("List of discovered") && !l.trim().is_empty())
+        .filter_map(|l| {
+            let cols: Vec<&str> = l.split_whitespace().collect();
+            let [name, ty, ep] = cols.as_slice() else { return None };
+            let kind = match ty.trim_end_matches('.') {
+                "_adb-tls-connect._tcp" => MdnsKind::Connect,
+                "_adb-tls-pairing._tcp" => MdnsKind::Pairing,
+                "_adb._tcp" => MdnsKind::Legacy,
+                _ => return None,
+            };
+            Some(MdnsService { name: (*name).to_string(), kind, endpoint: Serial::new(*ep).ok()? })
+        })
+        .collect()
 }
 
 /// Parse `adb devices -l` output.
@@ -158,6 +189,16 @@ mod tests {
         assert!(matches!(classify_error("failed to connect to '1.2.3.4:5555': No route to host"), Some(TransportError::Unreachable(_))));
         assert!(matches!(classify_error("adb: device '1.2.3.4:5555' not found"), Some(TransportError::NoDevice(_))));
         assert_eq!(classify_error("Success"), None);
+    }
+
+    #[test]
+    fn parses_mdns() {
+        let out = "List of discovered mdns services\nadb-R58M12-AbC\t_adb-tls-connect._tcp\t192.168.1.50:37123\nadb-R58M12-AbC  _adb-tls-pairing._tcp.  192.168.1.50:41234\nweird line\n";
+        let m = parse_mdns(out);
+        assert_eq!(m.len(), 2);
+        assert_eq!(m[0].kind, MdnsKind::Connect);
+        assert_eq!(m[0].endpoint.as_str(), "192.168.1.50:37123");
+        assert_eq!(m[1].kind, MdnsKind::Pairing);
     }
 
     #[test]

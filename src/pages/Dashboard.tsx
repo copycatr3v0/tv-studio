@@ -44,7 +44,7 @@ export function Dashboard() {
       >
         {devErr && <ErrorNote message={devErr} />}
         {devices && devices.length === 0 && (
-          <p className="text-sm text-ink-400">No TV connected. Connecting from this app arrives with the Connect TV wizard (M4).</p>
+          <p className="text-sm text-ink-400">No TV connected yet. Use Connect TV to add one.</p>
         )}
         {devices && devices.length > 0 && (
           <ul className="divide-y divide-ink-700">
