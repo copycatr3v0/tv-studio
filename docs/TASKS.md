@@ -61,5 +61,13 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [x] Deployment page (dry run, Apply Everything, live progress, cancel, result, undo) and Profiles page (save/load/import/export, history) (6 UI tests)
 - [ ] Real-TV run of a full deployment and of a reboot mid-run
 
-## M8–M10
+## M8 Benchmarks, drift, privacy, diagnostics
+- [x] Benchmark (tvs-insight): framestats key response/movement, cold start, return to Home, jank, idle CPU, PSS; cautious IQR-based verdicts (7 tests + mock run)
+- [x] Privacy audit with graded evidence (TV-named voice service, tested TVs, name-only, AppOps history, system-UID caveat); never claims listening (3 tests)
+- [x] Drift check vs. the last deployment: re-enabled apps, Home moved, launcher missing, settings, new preloads; repair = same plan after review (round-trip test)
+- [x] DB v3 bench runs; diagnostics bundle with IP/serial redaction
+- [x] Optimization Benchmarks, Privacy & Performance and Diagnostics pages (4 UI tests); all 15 sections functional
+- [ ] Real-TV benchmark repeatability check (two runs, same launcher, should read "no clear change")
+
+## M9–M10
 See PLAN.md. Tasks get broken down when each milestone starts.

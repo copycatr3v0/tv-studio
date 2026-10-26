@@ -14,6 +14,7 @@ use tvs_transport::{find_adb, AdbExeTransport, DeviceEntry, DeviceState, MdnsSer
 mod debloat;
 mod launcher_cmds;
 mod deploy_cmds;
+mod insight_cmds;
 
 pub struct AppState {
     pub(crate) store: Mutex<Store>,
@@ -191,7 +192,9 @@ pub fn run() {
             launcher_cmds::save_theme_version, launcher_cmds::list_theme_versions, launcher_cmds::load_theme_version, launcher_cmds::launchable_apps,
             deploy_cmds::deploy_plan, deploy_cmds::deploy_run, deploy_cmds::deploy_cancel, deploy_cmds::deploy_interrupted,
             deploy_cmds::deploy_resume, deploy_cmds::deploy_discard, deploy_cmds::deploy_history, deploy_cmds::undo_deployment,
-            deploy_cmds::save_deploy_profile, deploy_cmds::list_deploy_profiles, deploy_cmds::load_deploy_profile, deploy_cmds::import_deploy_profile
+            deploy_cmds::save_deploy_profile, deploy_cmds::list_deploy_profiles, deploy_cmds::load_deploy_profile, deploy_cmds::import_deploy_profile,
+            insight_cmds::bench_run, insight_cmds::bench_list, insight_cmds::bench_compare, insight_cmds::privacy_audit,
+            insight_cmds::drift_check, insight_cmds::diagnostics_bundle
         ])
         .run(tauri::generate_context!())
         .expect("error while running Android TV Customizer Studio");

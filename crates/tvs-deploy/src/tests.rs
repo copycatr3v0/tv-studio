@@ -227,3 +227,43 @@ fn resuming_after_an_interruption_skips_what_is_already_done() {
     assert!(r2.completed);
     assert_eq!(m.log().iter().filter(|l| l.ends_with("disable-user --user 0 com.tcl.logkit")).count(), 1);
 }
+
+#[test]
+fn drift_after_a_firmware_update_and_repair() {
+    let m = MockTransport::new();
+    m.add_device(SN, tv());
+    let (_d, a) = apk();
+    let mut input = everything(&a);
+    input.profile.settings.private_dns = PrivateDns::Keep;
+    let baseline = tvs_recovery::capture(&m, &s(), "id", "t0").unwrap();
+    let p = plan(&m, &s(), &input).unwrap();
+    assert!(run(&m, &s(), &p, &input, &mut TestHooks::default()).completed);
+    let fresh = crate::drift::check(&m, &s(), &input, Some(&baseline)).unwrap();
+    assert!(fresh.in_sync, "{:?}", fresh.would_change);
+
+    // The "firmware update": re-enables two packages, re-enables the stock launcher and takes Home back,
+    // resets animations, adds a new preload.
+    let mut d = m.device(SN).unwrap();
+    d.packages.insert("com.tcl.logkit".into(), true);
+    d.packages.insert("com.google.android.apps.tv.launcherx".into(), true);
+    d.home = Some(STOCK.into());
+    d.settings_global.remove("window_animation_scale");
+    d.packages.insert("com.tcl.newpromo".into(), true);
+    d.system.insert("com.tcl.newpromo".into());
+    d.dumpsys.insert("package com.tcl.logkit".into(), "requested permissions:\n".into());
+    m.add_device(SN, d);
+
+    let drift = crate::drift::check(&m, &s(), &input, Some(&baseline)).unwrap();
+    assert!(!drift.in_sync);
+    assert_eq!(drift.reenabled, vec!["com.tcl.logkit"]);
+    assert!(drift.home_moved && !drift.launcher_missing);
+    assert_eq!(drift.new_packages, vec!["com.tcl.newpromo"]);
+    assert!(drift.would_change.iter().any(|t| t.contains("Animation")));
+    assert!(m.log().iter().rev().take(40).all(|l| !l.contains("disable-user") && !l.contains("settings put")), "check is read-only");
+
+    // Repair = the same plan, run after review.
+    assert!(drift.plan.runnable);
+    let r = run(&m, &s(), &drift.plan, &input, &mut TestHooks::default());
+    assert!(r.completed, "{:#?}", r.results);
+    assert!(crate::drift::check(&m, &s(), &input, Some(&baseline)).unwrap().in_sync);
+}

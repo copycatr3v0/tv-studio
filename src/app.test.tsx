@@ -28,10 +28,10 @@ describe("navigation", () => {
 
 describe("planned sections", () => {
   it("render no interactive controls", () => {
-    const s = SECTIONS.find((x) => x.id === "privacy")!;
+    const s = { ...SECTIONS[0]!, milestone: "M9" as const };
     const { container } = render(<Planned section={s} />);
     expect(container.querySelectorAll("button, input, select, textarea")).toHaveLength(0);
-    expect(screen.getByText("M8")).toBeInTheDocument();
+    expect(screen.getByText("M9")).toBeInTheDocument();
   });
 });
 

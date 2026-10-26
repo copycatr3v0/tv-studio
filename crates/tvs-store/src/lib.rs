@@ -66,6 +66,16 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE deployments ADD COLUMN profile TEXT;
     ALTER TABLE deployments ADD COLUMN snapshot_id INTEGER REFERENCES snapshots(id);
     "#,
+    // v3: benchmark runs.
+    r#"
+    CREATE TABLE bench_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fingerprint TEXT NOT NULL REFERENCES devices(fingerprint),
+        label TEXT NOT NULL,
+        created TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        body TEXT NOT NULL
+    );
+    "#,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -259,6 +269,30 @@ impl Store {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct BenchMeta { pub id: i64, pub label: String, pub created: String }
+
+impl Store {
+    pub fn save_bench(&self, fingerprint: &str, label: &str, body: &serde_json::Value) -> Result<i64> {
+        self.conn.execute("INSERT INTO bench_runs(fingerprint, label, body) VALUES(?1,?2,?3)", params![fingerprint, label, body.to_string()])?;
+        Ok(self.conn.last_insert_rowid())
+    }
+    pub fn list_bench(&self, fingerprint: &str) -> Result<Vec<BenchMeta>> {
+        let mut st = self.conn.prepare("SELECT id, label, created FROM bench_runs WHERE fingerprint=?1 ORDER BY id DESC")?;
+        let rows = st.query_map(params![fingerprint], |r| Ok(BenchMeta { id: r.get(0)?, label: r.get(1)?, created: r.get(2)? }))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+    /// (fingerprint, body) of one run.
+    pub fn get_bench(&self, id: i64) -> Result<Option<(String, serde_json::Value)>> {
+        let row: Option<(String, String)> = self.conn.query_row("SELECT fingerprint, body FROM bench_runs WHERE id=?1", params![id], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
+        Ok(match row { Some((f, b)) => Some((f, serde_json::from_str(&b)?)), None => None })
+    }
+    /// The newest deployment that changed something and finished (fully or partly).
+    pub fn last_applied_deployment(&self, fingerprint: &str) -> Result<Option<DeploymentRow>> {
+        Ok(self.deployments(fingerprint, 50)?.into_iter().find(|d| matches!(d.status.as_str(), "completed" | "partial" | "stopped") && d.profile.is_some()))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct ProfileMeta { pub name: String, pub version: i64, pub created: String }
 
 impl Store {
@@ -382,9 +416,24 @@ mod tests {
             c.execute("INSERT INTO deployments(fingerprint) VALUES('d')", []).unwrap();
         }
         let s = Store::open(&p).unwrap();
-        assert_eq!(s.schema_version().unwrap(), 2);
+        assert_eq!(s.schema_version().unwrap(), MIGRATIONS.len() as i64);
         let r = s.interrupted_deployment("d").unwrap().unwrap();
         assert_eq!(r.profile, None);
+    }
+
+    #[test]
+    fn bench_runs_and_last_applied() {
+        let s = Store::open_in_memory().unwrap();
+        s.upsert_device("d", "x", None, None, None).unwrap();
+        let a = s.save_bench("d", "before", &json!({"k": 1})).unwrap();
+        let b = s.save_bench("d", "after", &json!({"k": 2})).unwrap();
+        assert_eq!(s.list_bench("d").unwrap().iter().map(|m| m.id).collect::<Vec<_>>(), vec![b, a]);
+        assert_eq!(s.get_bench(a).unwrap(), Some(("d".to_string(), json!({"k": 1}))));
+        let d1 = s.start_deployment("d", &json!({"p": 1}), None).unwrap();
+        s.finish_deployment(d1, "completed").unwrap();
+        let d2 = s.start_deployment("d", &json!({"p": 2}), None).unwrap();
+        s.finish_deployment(d2, "abandoned").unwrap();
+        assert_eq!(s.last_applied_deployment("d").unwrap().unwrap().id, d1);
     }
 
     #[test]

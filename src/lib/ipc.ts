@@ -194,6 +194,32 @@ export const HistoryRow = z.object({ id: z.number(), started: z.string(), finish
 export type HistoryRow = z.infer<typeof HistoryRow>;
 export type ThemeIn = { config: Record<string, unknown>; wallpapers: { name: string; data_base64: string }[]; captions: string | null };
 
+const Stats = z.object({ n: z.number(), median: z.number(), p25: z.number(), p75: z.number(), p95: z.number(), min: z.number(), max: z.number() });
+export const BenchRun = z.object({
+  created: z.string(), launcher: z.string().nullable(), launcher_version: z.string().nullable(),
+  key_response_ms: z.array(z.number()), key_movement_ms: z.array(z.number()), keys_without_reaction: z.number(),
+  frames: z.number(), janky_frames: z.number(), cold_start_ms: z.array(z.number()), home_return_ms: z.array(z.number()),
+  idle_cpu_device_pct: z.number().nullable(), idle_cpu_launcher_pct: z.number().nullable(), launcher_pss_mb: z.number().nullable(),
+  mem_available_mb: z.number().nullable(), notes: z.array(z.string()),
+});
+export type BenchRun = z.infer<typeof BenchRun>;
+export const Metric = z.object({ key: z.string(), label: z.string(), unit: z.string(), before: Stats.nullable(), after: Stats.nullable(), verdict: z.enum(["better", "worse", "no_clear_change", "not_enough_data"]), note: z.string() });
+export type Metric = z.infer<typeof Metric>;
+export const BenchComparison = z.object({ before: BenchRun, after: BenchRun, metrics: z.array(Metric), same_launcher: z.boolean() });
+export type BenchComparison = z.infer<typeof BenchComparison>;
+export const BenchListItem = z.object({ id: z.number(), label: z.string(), created: z.string(), launcher: z.string().nullable() });
+export type BenchListItem = z.infer<typeof BenchListItem>;
+export const PrivacyEntry = z.object({ package: z.string(), enabled: z.boolean(), category: z.enum(["voice", "acr", "telemetry", "unknown"]), note: z.string(), evidence: z.array(z.string()), mic_history: z.enum(["recorded", "none_returned", "unknown"]) });
+export type PrivacyEntry = z.infer<typeof PrivacyEntry>;
+export const PrivacyAudit = z.object({ entries: z.array(PrivacyEntry), skipped: z.number(), installed: z.number() });
+export type PrivacyAudit = z.infer<typeof PrivacyAudit>;
+export const DriftResult = z.object({
+  deployment_id: z.number(), deployment_started: z.string(),
+  report: z.object({ plan: Plan, reenabled: z.array(z.string()), launcher_missing: z.boolean(), home_moved: z.boolean(), new_packages: z.array(z.string()), would_change: z.array(z.string()), in_sync: z.boolean() }),
+  request: z.object({ profile: Profile, theme: z.unknown().nullable().optional() }),
+});
+export type DriftResult = z.infer<typeof DriftResult>;
+
 export const CmdError = z.object({
   kind: z.enum(["store", "transport", "invalid"]),
   message: z.unknown(),
@@ -278,6 +304,12 @@ export const api = {
   listDeployProfiles: () => call("list_deploy_profiles", z.array(SavedTheme)),
   loadDeployProfile: (name: string, version: number) => call("load_deploy_profile", Profile, { name, version }),
   importDeployProfile: (jsonText: string) => call("import_deploy_profile", Profile, { jsonText }),
+  benchRun: (serial: string, label: string, quick: boolean) => call("bench_run", z.object({ id: z.number(), run: BenchRun }), { serial, label, quick }),
+  benchList: (serial: string) => call("bench_list", z.array(BenchListItem), { serial }),
+  benchCompare: (beforeId: number, afterId: number) => call("bench_compare", BenchComparison, { beforeId, afterId }),
+  privacyAudit: (serial: string) => call("privacy_audit", PrivacyAudit, { serial }),
+  driftCheck: (serial: string) => call("drift_check", DriftResult.nullable(), { serial }),
+  diagnosticsBundle: (serial: string | null) => call("diagnostics_bundle", z.record(z.unknown()), { serial }),
   restoreApply: (serial: string, scope: string[] | null) => call("restore_apply", ChangeReport, { serial, scope }),
 };
 
@@ -285,6 +317,11 @@ export const api = {
 export async function onDeployEvent(cb: (e: DeployEvent) => void): Promise<() => void> {
   if (!inTauri()) return () => {};
   return listen("deploy-event", (e) => { const r = DeployEvent.safeParse(e.payload); if (r.success) cb(r.data); });
+}
+
+export async function onBenchProgress(cb: (p: { what: string; done: number; total: number }) => void): Promise<() => void> {
+  if (!inTauri()) return () => {};
+  return listen("bench-progress", (e) => cb(e.payload as { what: string; done: number; total: number }));
 }
 
 /** Subscribe to batch progress; returns an unsubscribe function (no-op outside Tauri). */

@@ -17,10 +17,13 @@ import { LauncherPage } from "./pages/LauncherPage";
 import { useThemeEditor } from "./theme/useThemeEditor";
 import { DeploymentPage } from "./pages/DeploymentPage";
 import { ProfilesPage } from "./pages/ProfilesPage";
+import { BenchmarksPage } from "./pages/BenchmarksPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
+import { DiagnosticsPage } from "./pages/DiagnosticsPage";
 import { emptyProfile, type Profile } from "./lib/ipc";
 
 const GROUPS = ["Device", "Design", "Clean up", "Apply", "App"] as const;
-const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore", "themes", "editor", "launcher", "deploy", "profiles"]);
+const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore", "themes", "editor", "launcher", "deploy", "profiles", "benchmarks", "privacy", "diagnostics"]);
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -105,6 +108,9 @@ export function App() {
           {current.id === "launcher" && <LauncherPage serial={serial} onSelect={setSerial} />}
           {current.id === "deploy" && <DeploymentPage serial={serial} onSelect={setSerial} profile={profile} setProfile={setProfile} editor={editor}
             advanced={mode === "advanced"} requireDryRun={settings?.default_dry_run ?? true} onOpenDebloat={() => setActive("debloat")} />}
+          {current.id === "benchmarks" && <BenchmarksPage serial={serial} onSelect={setSerial} />}
+          {current.id === "privacy" && <PrivacyPage serial={serial} onSelect={setSerial} onOpenDebloat={() => setActive("debloat")} onOpenDeployment={() => setActive("deploy")} />}
+          {current.id === "diagnostics" && <DiagnosticsPage serial={serial} onSelect={setSerial} />}
           {current.id === "profiles" && <ProfilesPage serial={serial} onSelect={setSerial} profile={profile} setProfile={setProfile} onOpenDeployment={() => setActive("deploy")} />}
           {!BUILT.has(current.id) && <Planned section={current} />}
         </div>

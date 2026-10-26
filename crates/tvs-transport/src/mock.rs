@@ -43,6 +43,14 @@ pub struct MockDevice {
     pub no_content_write: bool,
     /// Firmware where `cp` into Android/data is refused.
     pub no_cp_into_app_data: bool,
+    /// `logcat -d ...` output; `logcat -c` clears it.
+    pub logcat: String,
+    pub pids: BTreeMap<String, u32>,
+    /// `appops get <pkg> RECORD_AUDIO` output per package.
+    pub appops: BTreeMap<String, String>,
+    pub settings_secure: BTreeMap<String, String>,
+    /// WaitTime reported by `am start -W`.
+    pub cold_start_ms: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -244,6 +252,20 @@ impl Transport for MockTransport {
                 if dev.focused.as_deref().is_some_and(|f| f.starts_with(&format!("{pkg}/"))) { dev.focused = None; }
                 ok("")
             }
+            ["am", "start", "-W", rest @ ..] => {
+                if let Some(i) = rest.iter().position(|a| *a == "-n") {
+                    if let Some(comp) = rest.get(i + 1) {
+                        let pkg = comp.split('/').next().unwrap_or_default();
+                        if dev.packages.get(pkg) == Some(&true) { dev.focused = Some((*comp).into()); }
+                    }
+                }
+                ok(format!("Starting: Intent {{ }}\nStatus: ok\nWaitTime: {}\nComplete\n", dev.cold_start_ms))
+            }
+            ["logcat", "-c", ..] => { dev.logcat.clear(); ok("") }
+            ["logcat", "-d", ..] => ok(dev.logcat.clone()),
+            ["pidof", pkg] => match dev.pids.get(*pkg) { Some(p) => ok(format!("{p}\n")), None => fail("", 1) },
+            ["appops", "get", pkg, "RECORD_AUDIO"] => ok(dev.appops.get(*pkg).cloned().unwrap_or_else(|| "No operations.\n".into())),
+            ["settings", "get", "secure", key] => ok(format!("{}\n", dev.settings_secure.get(*key).cloned().unwrap_or_else(|| "null".into()))),
             ["am", "start", "-n", comp] => {
                 let pkg = comp.split('/').next().unwrap_or_default();
                 if dev.packages.get(pkg) == Some(&true) { dev.focused = Some((*comp).into()); ok(format!("Starting: Intent {{ cmp={comp} }}\n")) }

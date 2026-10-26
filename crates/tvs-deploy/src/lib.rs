@@ -1,5 +1,6 @@
 //! "Apply Everything": profile → previewed plan (dry run) → verified, journaled execution.
 
+pub mod drift;
 pub mod plan;
 pub mod profile;
 pub mod run;

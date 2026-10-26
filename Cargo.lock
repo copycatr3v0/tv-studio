@@ -3713,6 +3713,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "image",
+ "regex",
  "serde",
  "serde_json",
  "tauri",
@@ -3721,6 +3722,7 @@ dependencies = [
  "tvs-core",
  "tvs-deploy",
  "tvs-device",
+ "tvs-insight",
  "tvs-kb",
  "tvs-launcher",
  "tvs-recovery",
@@ -3765,6 +3767,20 @@ dependencies = [
  "thiserror 1.0.69",
  "tvs-core",
  "tvs-safety",
+ "tvs-transport",
+]
+
+[[package]]
+name = "tvs-insight"
+version = "0.1.0"
+dependencies = [
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "tvs-core",
+ "tvs-device",
+ "tvs-kb",
  "tvs-transport",
 ]
 
