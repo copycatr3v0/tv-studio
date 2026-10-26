@@ -1,0 +1,53 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Boxes, Cable, Gauge, HardDriveDownload, History, LayoutDashboard, MonitorSmartphone,
+  Package, Palette, Paintbrush, Rocket, Settings, ShieldCheck, Stethoscope, Trash2,
+} from "lucide-react";
+
+export type SectionId =
+  | "dashboard" | "connect" | "inspector" | "themes" | "editor" | "launcher" | "apps" | "debloat"
+  | "privacy" | "benchmarks" | "deploy" | "profiles" | "restore" | "diagnostics" | "settings";
+
+/** Where a section's changes land, shown on every page (prompt §14). */
+export type Scope = "android" | "launcher" | "manual" | "app";
+
+export interface Section {
+  id: SectionId;
+  label: string;
+  icon: LucideIcon;
+  group: "Device" | "Design" | "Clean up" | "Apply" | "App";
+  /** Milestone in docs/PLAN.md where the section becomes functional. */
+  milestone: `M${number}`;
+  scope: Scope[];
+  advancedOnly?: boolean;
+  summary: string;
+}
+
+export const SECTIONS: readonly Section[] = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Device", milestone: "M3", scope: ["app"], summary: "App status and connected TVs." },
+  { id: "connect", label: "Connect TV", icon: Cable, group: "Device", milestone: "M4", scope: ["manual", "android"], summary: "Developer options guide, pairing, legacy ADB connect and diagnostics." },
+  { id: "inspector", label: "Device Inspector", icon: MonitorSmartphone, group: "Device", milestone: "M4", scope: ["android"], summary: "Model, Android version, fingerprint, RAM, storage, current Home and HOME candidates." },
+  { id: "themes", label: "Themes", icon: Palette, group: "Design", milestone: "M6", scope: ["launcher"], summary: "Fifteen original themes to start from, plus CleanYourTV theme import." },
+  { id: "editor", label: "Live Theme Editor", icon: Paintbrush, group: "Design", milestone: "M6", scope: ["launcher"], summary: "16:9 drag-and-drop editor with D-pad simulation, undo/redo and versions." },
+  { id: "launcher", label: "Launcher Builder", icon: Boxes, group: "Design", milestone: "M6", scope: ["launcher"], advancedOnly: true, summary: "Launcher version, optional modules and remote-key helpers." },
+  { id: "apps", label: "Applications", icon: Package, group: "Clean up", milestone: "M5", scope: ["android"], summary: "Every installed app with its real state, type and known function." },
+  { id: "debloat", label: "Debloat Center", icon: Trash2, group: "Clean up", milestone: "M5", scope: ["android"], summary: "Safe, Balanced and Advanced modes on top of a hard protection list." },
+  { id: "privacy", label: "Privacy & Performance", icon: ShieldCheck, group: "Clean up", milestone: "M8", scope: ["android"], summary: "Evidence-graded telemetry audit, Private DNS and animation scales." },
+  { id: "benchmarks", label: "Optimization Benchmarks", icon: Gauge, group: "Clean up", milestone: "M8", scope: ["android"], advancedOnly: true, summary: "Before/after key latency, jank, cold start, memory and idle CPU, with spread." },
+  { id: "deploy", label: "Deployment", icon: Rocket, group: "Apply", milestone: "M7", scope: ["android", "launcher"], summary: "Dry-run plan, Apply Everything, live log and verified results." },
+  { id: "profiles", label: "Profiles", icon: HardDriveDownload, group: "Apply", milestone: "M7", scope: ["app"], summary: "Versioned deployment profiles: save, compare, import, export." },
+  { id: "restore", label: "Restore", icon: History, group: "Apply", milestone: "M7", scope: ["android", "launcher"], summary: "Exact rollback to the recorded baseline, full or selective." },
+  { id: "diagnostics", label: "Diagnostics", icon: Stethoscope, group: "App", milestone: "M8", scope: ["android"], advancedOnly: true, summary: "Firmware drift check, connection tests and exportable logs." },
+  { id: "settings", label: "Settings", icon: Settings, group: "App", milestone: "M3", scope: ["app"], summary: "Mode, adb location, dry-run default and batch size." },
+] as const;
+
+export const visibleSections = (mode: "beginner" | "advanced"): Section[] =>
+  SECTIONS.filter((s) => mode === "advanced" || !s.advancedOnly);
+
+export const SCOPE_LABEL: Record<Scope, string> = {
+  android: "Changes Android",
+  launcher: "Changes the Studio launcher",
+  manual: "Needs a step on the TV",
+  app: "This app only",
+};
+

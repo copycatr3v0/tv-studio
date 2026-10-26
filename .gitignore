@@ -1,0 +1,12 @@
+node_modules/
+dist/
+target/
+src-tauri/gen/
+*.log
+.DS_Store
+# never commit device data or keys
+backup/
+shots/
+adbkey*
+*.keystore
+*.jks

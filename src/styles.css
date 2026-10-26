@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #0b0d10;
+  --color-ink-900: #111418;
+  --color-ink-850: #161a1f;
+  --color-ink-800: #1c2127;
+  --color-ink-700: #262c34;
+  --color-ink-600: #343b45;
+  --color-ink-400: #7b8593;
+  --color-ink-300: #a3acb8;
+  --color-ink-100: #e6e9ee;
+  --color-accent-400: #5eead4;
+  --color-accent-500: #2dd4bf;
+  --color-accent-900: #0f3a36;
+  --color-warn-400: #fbbf24;
+  --color-danger-400: #f87171;
+  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-ink-950);
+  color: var(--color-ink-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+:focus-visible { outline: 2px solid var(--color-accent-400); outline-offset: 2px; }
+.selectable { user-select: text; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
