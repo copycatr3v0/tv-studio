@@ -13,6 +13,21 @@
 | M9 | Integration | M8 | E2E on mock (all §15 cases) + one Google TV + one Android TV, documented as real-device or simulated | Opus + Sonnet (tests) |
 | M10 | Release | M9 | NSIS + portable EXE from CI, licences/NOTICE, README, RECOVERY, SECURITY, BENCHMARKS, TESTING complete; installs on clean Win10/11 | Opus, Haiku (docs) |
 
+## Cross-cutting requirement: Revert to original
+
+A **Revert to original** button is always visible in the app header (and on the Restore page). It returns the
+TV to its write-once baseline and reports only what it verified on the TV. Every milestone that adds a new
+kind of change must add its undo step to this same revert, with tests, before the milestone counts as done:
+
+| Milestone | Change it adds | Revert step it must add |
+|---|---|---|
+| M5 ✅ | Disabled packages, Home, animation scales | Re-enable recorded-enabled packages, set Home back, restore scales |
+| M6 | Studio launcher + theme files | Re-enable the stock launcher, set it as Home and **verify on screen**, *then* uninstall the Studio launcher and delete pushed theme files |
+| M7 | Privacy settings (Private DNS etc.), screensaver, display | Put each recorded setting back (`settings delete` when it was unset) |
+| M8 | Drift repairs | Covered by the same baseline; repairs never overwrite it |
+
+Order rule: Home is handed back and verified before anything that could leave the TV without a launcher.
+
 ## Risk register
 
 | Risk | Likelihood | Impact | Mitigation |

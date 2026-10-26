@@ -10,6 +10,7 @@ import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { DebloatPage } from "./pages/DebloatPage";
 import { RestorePage } from "./pages/RestorePage";
 import { ErrorNote } from "./components/ui";
+import { RevertButton } from "./components/Revert";
 
 const GROUPS = ["Device", "Design", "Clean up", "Apply", "App"] as const;
 const BUILT = new Set<SectionId>(["dashboard", "settings", "connect", "inspector", "apps", "debloat", "restore"]);
@@ -73,9 +74,12 @@ export function App() {
       </nav>
 
       <main className="flex-1 overflow-y-auto">
-        <header className="border-b border-ink-700 px-8 py-5">
-          <h1 className="text-xl font-semibold">{current.label}</h1>
-          <p className="mt-0.5 text-sm text-ink-400">{current.summary}</p>
+        <header className="flex items-start justify-between gap-6 border-b border-ink-700 px-8 py-5">
+          <div>
+            <h1 className="text-xl font-semibold">{current.label}</h1>
+            <p className="mt-0.5 text-sm text-ink-400">{current.summary}</p>
+          </div>
+          <RevertButton serial={serial} onSelect={setSerial} />
         </header>
         <div className="px-8 py-6">
           {loadErr && <div className="mb-5 max-w-2xl"><ErrorNote message={loadErr} /></div>}

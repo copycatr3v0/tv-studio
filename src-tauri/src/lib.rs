@@ -182,7 +182,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_info, get_settings, save_settings, list_devices, diagnose, connect_tv, pair_tv,
             discover_wireless, disconnect_tv, probe_device, debloat::inventory, debloat::evaluate_debloat,
-            debloat::apply_debloat, debloat::restore_preview, debloat::restore_apply
+            debloat::apply_debloat, debloat::restore_preview, debloat::restore_apply, debloat::baseline_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running Android TV Customizer Studio");

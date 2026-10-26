@@ -187,6 +187,7 @@ export const api = {
   applyDebloat: (serial: string, packages: string[], confirmed: string[]) =>
     call("apply_debloat", ApplyResult, { request: { serial, packages, confirmed } }),
   restorePreview: (serial: string, scope: string[] | null) => call("restore_preview", RestorePreview, { serial, scope }),
+  baselineStatus: (serial: string) => call("baseline_status", z.object({ identity: z.string(), created: z.string().nullable() }), { serial }),
   restoreApply: (serial: string, scope: string[] | null) => call("restore_apply", ChangeReport, { serial, scope }),
 };
 

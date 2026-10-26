@@ -33,6 +33,7 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [x] Inventory (all/disabled/system per user 0), live facts gathering
 - [x] Baseline (write-once) + pre-change snapshots; verified batch disable with stop-on-refusal / stop-on-disconnect, no blind retry; exact restore (full or scoped) with readback (9 tests)
 - [x] Applications, Debloat Center (Safe / Balanced / Advanced, dry-run check, per-item confirmation) and Restore UI (4 UI tests)
+- [x] "Revert to original" button in the app header + Restore page, with a baseline-status check (3 UI tests)
 - [ ] Real-device round trip on a Google TV and an Android TV (mock-only so far)
 
 ## M6 Launcher fork + theme system (next)

@@ -7,6 +7,7 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
 
 import { DebloatPage } from "./pages/DebloatPage";
 import { RestorePage } from "./pages/RestorePage";
+import { RevertButton } from "./components/Revert";
 
 const kb = (category: string, disabled_in: number, kept_in = 0) => ({ disabled_in, kept_in, category, notes: [], devices: [] });
 const row = (name: string, extra: Record<string, unknown> = {}) => ({
@@ -34,7 +35,7 @@ describe("Debloat Center", () => {
     invoke.mockImplementation(async (cmd: string) => (cmd === "inventory" ? INVENTORY : []));
     render(<DebloatPage serial="tv:5555" onSelect={() => {}} />);
     const logkit = await screen.findByRole("checkbox", { name: /com\.tcl\.logkit/ });
-    expect(logkit).toBeChecked();
+    await waitFor(() => expect(logkit).toBeChecked());
     expect(screen.getByRole("checkbox", { name: /gamecenter/ })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: /katniss/ })).not.toBeChecked();
     expect(screen.queryByText("com.android.systemui")).toBeNull();
@@ -90,10 +91,33 @@ describe("Debloat Center", () => {
   });
 });
 
-describe("Restore", () => {
+describe("Revert to original", () => {
+  it("says so when this app never changed the TV", async () => {
+    invoke.mockImplementation(async (cmd: string) => (cmd === "list_devices" ? [] : cmd === "baseline_status" ? { identity: "id", created: null } : Promise.reject(new Error(cmd))));
+    render(<RestorePage serial="tv:5555" onSelect={() => {}} />);
+    expect(await screen.findByText(/has not changed this TV/)).toBeInTheDocument();
+    expect(invoke.mock.calls.some((c) => c[0] === "restore_preview")).toBe(false);
+  });
+
+  it("header button opens the revert dialog for the selected TV", async () => {
+    invoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "list_devices") return [{ serial: "tv:5555", state: "device", model: "Smart TV Pro", product: null }];
+      if (cmd === "baseline_status") return { identity: "id", created: "2026-10-26T10:00:00Z" };
+      if (cmd === "restore_preview") return { baseline_created: "2026-10-26T10:00:00Z", plan: { enable: [], left_disabled: [], not_in_snapshot: [], set_home: null, settings: [] } };
+      throw new Error(cmd);
+    });
+    render(<RevertButton serial="tv:5555" onSelect={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /Revert to original/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByText(/already matches its original state/)).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("previews the plan, explains what stays, and reports the verified result", async () => {
     invoke.mockImplementation(async (cmd: string) => {
       if (cmd === "list_devices") return [];
+      if (cmd === "baseline_status") return { identity: "id", created: "2026-10-26T10:00:00Z" };
       if (cmd === "restore_preview") return { baseline_created: "2026-10-26T10:00:00Z", plan: { enable: ["com.tcl.logkit"], left_disabled: ["com.tcl.off"], not_in_snapshot: [], set_home: null, settings: [["window_animation_scale", "0.5"]] } };
       if (cmd === "restore_apply") return { changed: ["com.tcl.logkit", "window_animation_scale"], refused: [], unchanged: [], skipped: [], stopped: null };
       throw new Error(cmd);
@@ -101,9 +125,9 @@ describe("Restore", () => {
     render(<RestorePage serial="tv:5555" onSelect={() => {}} />);
     expect(await screen.findByText(/Re-enable 1 package/)).toBeInTheDocument();
     expect(screen.getByText(/already disabled before/)).toHaveTextContent("com.tcl.off");
-    fireEvent.click(screen.getByRole("button", { name: /Restore everything/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
-    const panel = await screen.findByText("Restore result");
+    fireEvent.click(screen.getByRole("button", { name: /Revert to original/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, revert" }));
+    const panel = await screen.findByText("Revert result");
     expect(within(panel.closest("section")!).getByText("2 verified on the TV")).toBeInTheDocument();
   });
 });

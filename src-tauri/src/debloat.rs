@@ -144,6 +144,21 @@ fn preview(app: &tauri::AppHandle, t: &dyn tvs_transport::Transport, serial: &tv
     Ok((snap, plan))
 }
 
+#[derive(Debug, Serialize)]
+pub struct BaselineStatus { identity: String, created: Option<String> }
+
+/// Whether this app has ever changed this TV (a baseline exists), without touching the TV beyond getprop.
+#[tauri::command]
+pub async fn baseline_status(app: tauri::AppHandle, serial: String) -> CmdResult<BaselineStatus> {
+    let serial = serial_arg(&serial)?;
+    let t = transport(&app.state::<AppState>())?;
+    let identity = blocking(move || tvs_device::probe::quick_identity(&t, &serial)
+        .ok_or_else(|| CmdError::Invalid("Could not read the TV's identity. Check that it is connected and authorized.".into()))).await?;
+    let created = app.state::<AppState>().store.lock().unwrap().baseline(&identity)?
+        .and_then(|v| v.get("created").and_then(|c| c.as_str()).map(str::to_string));
+    Ok(BaselineStatus { identity, created })
+}
+
 #[tauri::command]
 pub async fn restore_preview(app: tauri::AppHandle, serial: String, scope: Option<Vec<String>>) -> CmdResult<RestorePreview> {
     let serial = serial_arg(&serial)?;
