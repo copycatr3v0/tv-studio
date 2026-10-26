@@ -10,3 +10,4 @@ shots/
 adbkey*
 *.keystore
 *.jks
+.sync/
