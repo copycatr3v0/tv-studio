@@ -24,6 +24,12 @@ impl From<ThemeError> for CmdError {
 
 /// The APK shipped inside the app (or `TVS_LAUNCHER_APK` for development builds).
 pub(crate) fn bundled_apk(app: &tauri::AppHandle) -> Option<PathBuf> {
+    if crate::demo_on(&app.state::<AppState>()) {
+        // The simulated TV "installs" any file that looks like an APK; never a real APK on a real TV.
+        let p = std::env::temp_dir().join("tv-studio-demo-launcher.apk");
+        if !p.is_file() { std::fs::write(&p, b"PK\x03\x04 simulated studio launcher").ok()?; }
+        return Some(p);
+    }
     if let Some(p) = std::env::var_os("TVS_LAUNCHER_APK").map(PathBuf::from).filter(|p| p.is_file()) { return Some(p); }
     let dir = app.state::<AppState>().resource_dir.clone()?;
     [dir.join("resources").join("launcher").join("studio-home.apk"), dir.join("launcher").join("studio-home.apk")]

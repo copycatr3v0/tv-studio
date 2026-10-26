@@ -133,10 +133,11 @@ pub fn plan(t: &dyn Transport, s: &Serial, input: &DeployInput) -> Result<Plan, 
 
     // Debloat: everything blocked or unconfirmed blocks the plan; already-disabled packages drop out.
     let mut names = vec![];
+    let mut invalid = vec![];
     for n in &p.debloat.packages {
         match PackageName::new(n.clone()) {
             Ok(pn) => names.push(pn),
-            Err(_) => notes.push(format!("Ignored invalid package name {n:?}")),
+            Err(_) => invalid.push(format!("{n:?} is not a valid package name")),
         }
     }
     let stock = stock_launcher(&installed, launcher.resolved_home.as_deref());
@@ -145,7 +146,8 @@ pub fn plan(t: &dyn Transport, s: &Serial, input: &DeployInput) -> Result<Plan, 
     if p.launcher.disable_stock { if let Some(st) = &stock { sel.push(PackageName::new(st.clone()).unwrap()); } }
     let facts = gather_facts(t, s, &installed, &sel);
     let verdicts = evaluate_selection(&names, &facts);
-    let mut problems = vec![];
+    // An invalid name in an imported profile is a broken profile: refuse it rather than run the rest.
+    let mut problems = invalid;
     // Launchers never go through a debloat batch: batches don't wait for Home to be confirmed.
     for n in &names {
         if facts.usable_launchers.contains(n.as_str()) || KNOWN_STOCK_LAUNCHERS.contains(&n.as_str()) || n.as_str() == STUDIO_PKG {

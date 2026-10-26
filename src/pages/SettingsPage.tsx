@@ -2,6 +2,9 @@ import { useState, type FormEvent } from "react";
 import { api, IpcError, type AppSettings } from "../lib/ipc";
 import { Button, ErrorNote, Panel } from "../components/ui";
 
+export const DEMO_ADDRESS = "192.168.1.50";
+export const DEMO_CODE = "123456";
+
 export function SettingsPage({ settings, onSaved }: { settings: AppSettings; onSaved: (s: AppSettings) => void }) {
   const [draft, setDraft] = useState<AppSettings>(settings);
   const [err, setErr] = useState<string | null>(null);
@@ -61,6 +64,15 @@ export function SettingsPage({ settings, onSaved }: { settings: AppSettings; onS
         <input id="adb" value={draft.adb_path} placeholder="Leave empty to use the bundled adb"
           onChange={(e) => set("adb_path", e.target.value)}
           className="selectable mt-2 w-full rounded-lg border border-ink-600 bg-ink-850 px-3 py-1.5 font-mono text-sm" />
+      </Panel>
+
+      <Panel title="Demo">
+        <label className="flex items-start gap-3">
+          <input type="checkbox" className="mt-1 accent-teal-400" checked={draft.demo_mode} onChange={(e) => set("demo_mode", e.target.checked)} />
+          <span><span className={label}>Practice on a simulated TV</span><span className={hint + " block"}>
+            Every screen works against a built-in simulated TCL Google TV instead of adb. Nothing real is changed. Connect to {DEMO_ADDRESS} (pairing code {DEMO_CODE}).
+          </span></span>
+        </label>
       </Panel>
 
       <Panel title="Privacy">

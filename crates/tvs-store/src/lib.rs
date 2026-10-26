@@ -93,11 +93,13 @@ pub struct AppSettings {
     pub batch_size: u8,
     pub check_updates: bool,
     pub reduced_motion_ui: bool,
+    /// Run against a simulated TV instead of adb: nothing real is changed.
+    pub demo_mode: bool,
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
-        Self { ui_mode: UiMode::Beginner, adb_path: String::new(), default_dry_run: true, batch_size: 5, check_updates: false, reduced_motion_ui: false }
+        Self { ui_mode: UiMode::Beginner, adb_path: String::new(), default_dry_run: true, batch_size: 5, check_updates: false, reduced_motion_ui: false, demo_mode: false }
     }
 }
 

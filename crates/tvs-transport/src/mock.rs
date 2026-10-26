@@ -51,6 +51,10 @@ pub struct MockDevice {
     pub settings_secure: BTreeMap<String, String>,
     /// WaitTime reported by `am start -W`.
     pub cold_start_ms: u32,
+    /// When > 0, a HOME key press appends the input and resume log lines, this many ms apart.
+    pub home_return_ms: u32,
+    /// Fake epoch seconds for generated log lines.
+    pub log_clock: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -247,7 +251,20 @@ impl Transport for MockTransport {
                 ok("Success\n")
             }
             ["pm", "grant", pkg, _perm] => if dev.packages.contains_key(*pkg) { ok("") } else { fail(format!("Unknown package: {pkg}"), 1) },
-            ["input", "keyevent", "KEYCODE_HOME"] => { dev.focused = dev.home.clone().or_else(|| dev.home_claimants.first().cloned()); ok("") }
+            ["input", "keyevent", "KEYCODE_HOME"] => {
+                dev.focused = dev.home.clone().or_else(|| dev.home_claimants.first().cloned());
+                if dev.home_return_ms > 0 {
+                    if let Some(f) = dev.focused.clone() {
+                        let (pkg, cls) = f.split_once('/').unwrap_or_default();
+                        let class = if let Some(rel) = cls.strip_prefix('.') { format!("{pkg}.{rel}") } else { cls.to_string() };
+                        dev.log_clock += 10;
+                        let t = 1_761_480_000 + dev.log_clock;
+                        dev.logcat.push_str(&format!("  {t}.000  1000  1000 I Input: injectKeyEvent: KeyEvent {{ action=ACTION_DOWN, keyCode=KEYCODE_HOME }}\n"));
+                        dev.logcat.push_str(&format!("  {t}.{:03}  1000  1000 I wm_on_resume_called: [1,{class},RESUME]\n", dev.home_return_ms.min(999)));
+                    }
+                }
+                ok("")
+            }
             ["am", "force-stop", pkg] => {
                 if dev.focused.as_deref().is_some_and(|f| f.starts_with(&format!("{pkg}/"))) { dev.focused = None; }
                 ok("")

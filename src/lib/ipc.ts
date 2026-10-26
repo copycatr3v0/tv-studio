@@ -14,13 +14,14 @@ export const AppSettings = z.object({
   batch_size: z.number().int().min(1).max(10),
   check_updates: z.boolean(),
   reduced_motion_ui: z.boolean(),
+  demo_mode: z.boolean(),
 });
 export type AppSettings = z.infer<typeof AppSettings>;
 
 export const AdbInfo = z.object({
   path: z.string(),
   version: z.string().nullable(),
-  source: z.enum(["bundled", "system", "custom"]),
+  source: z.enum(["bundled", "system", "custom", "demo"]),
 });
 
 export const AppInfo = z.object({

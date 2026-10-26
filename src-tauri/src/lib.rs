@@ -3,7 +3,7 @@
 
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::Manager;
 use tvs_store::{AppSettings, Store};
 use std::time::Duration;
@@ -21,6 +21,16 @@ pub struct AppState {
     db_path: PathBuf,
     pub(crate) resource_dir: Option<PathBuf>,
     pub(crate) cancel_deploy: std::sync::atomic::AtomicBool,
+    /// The simulated TV world, created the first time demo mode is used and kept for the whole session
+    /// so changes persist between screens (and Revert to original has something to undo).
+    demo: OnceLock<Arc<tvs_transport::mock::MockTransport>>,
+}
+
+/// Whatever the commands talk to: adb.exe, or the simulated TV in demo mode.
+pub(crate) type Tx = Arc<dyn Transport>;
+
+pub(crate) fn demo_on(state: &AppState) -> bool {
+    std::env::var_os("TVS_DEMO").is_some_and(|v| v == "1") || state.store.lock().unwrap().settings().map(|s| s.demo_mode).unwrap_or(false)
 }
 
 #[derive(Debug, Serialize)]
@@ -51,9 +61,13 @@ fn resolve_adb(state: &AppState, settings: &AppSettings) -> Option<(PathBuf, &'s
     find_adb(None).map(|p| (p, "system"))
 }
 
-pub(crate) fn transport(state: &AppState) -> CmdResult<AdbExeTransport> {
+pub(crate) fn transport(state: &AppState) -> CmdResult<Tx> {
+    if demo_on(state) {
+        let world = state.demo.get_or_init(|| Arc::new(tvs_demo::demo_transport()));
+        return Ok(world.clone());
+    }
     let settings = state.store.lock().unwrap().settings()?;
-    resolve_adb(state, &settings).map(|(p, _)| AdbExeTransport::new(p)).ok_or(CmdError::Transport(TransportError::AdbMissing))
+    resolve_adb(state, &settings).map(|(p, _)| Arc::new(AdbExeTransport::new(p)) as Tx).ok_or(CmdError::Transport(TransportError::AdbMissing))
 }
 
 #[tauri::command]
@@ -62,6 +76,10 @@ fn app_info(state: tauri::State<'_, AppState>) -> CmdResult<AppInfo> {
         let store = state.store.lock().unwrap();
         (store.settings()?, store.schema_version()?)
     };
+    if demo_on(&state) {
+        let adb = Some(AdbInfo { path: "Simulated TCL Google TV".into(), version: Some("demo".into()), source: "demo" });
+        return Ok(AppInfo { version: env!("CARGO_PKG_VERSION"), db_path: state.db_path.display().to_string(), schema_version, adb });
+    }
     let adb = resolve_adb(&state, &settings).map(|(p, source)| AdbInfo {
         version: AdbExeTransport::new(p.clone()).version().ok(),
         path: p.display().to_string(),
@@ -105,12 +123,21 @@ pub struct Diagnosis { endpoint: String, port_state: PortState, advice: &'static
 /// Plain TCP check, no adb: tells "wrong IP / asleep" apart from "debugging off" apart from "listening".
 /// Also used at the end of a session to prove the port is closed (only Refused counts).
 #[tauri::command]
-async fn diagnose(address: String) -> CmdResult<Diagnosis> {
+async fn diagnose(state: tauri::State<'_, AppState>, address: String) -> CmdResult<Diagnosis> {
     let ep = Endpoint::parse(&address, DEFAULT_PORT)?;
+    if demo_on(&state) {
+        let st = demo_port_state(&ep);
+        return Ok(Diagnosis { endpoint: format!("{}:{}", ep.host, ep.port), advice: advice(&st, ep.port), port_state: st });
+    }
     blocking(move || {
         let st = probe_port(&ep, Duration::from_secs(3));
         Ok(Diagnosis { endpoint: format!("{}:{}", ep.host, ep.port), advice: advice(&st, ep.port), port_state: st })
     }).await
+}
+
+/// In demo mode the simulated TV answers on its address; anything else looks like a TV that is off.
+fn demo_port_state(ep: &Endpoint) -> PortState {
+    if ep.host == tvs_demo::DEMO_HOST && [5555, 37123, 41234].contains(&ep.port) { PortState::Open } else { PortState::Timeout }
 }
 
 #[derive(Debug, Serialize)]
@@ -121,8 +148,9 @@ pub struct ConnectResult { serial: Serial, state: Option<DeviceState>, model: Op
 async fn connect_tv(state: tauri::State<'_, AppState>, address: String) -> CmdResult<ConnectResult> {
     let ep = Endpoint::parse(&address, DEFAULT_PORT)?;
     let t = transport(&state)?;
+    let demo = demo_on(&state);
     blocking(move || {
-        let st = probe_port(&ep, Duration::from_secs(3));
+        let st = if demo { demo_port_state(&ep) } else { probe_port(&ep, Duration::from_secs(3)) };
         if st != PortState::Open {
             return Err(CmdError::Invalid(advice(&st, ep.port).to_string()));
         }
@@ -180,7 +208,7 @@ pub fn run() {
             let db_path = data_dir.join("studio.db");
             let store = Store::open(&db_path)?;
             let resource_dir = app.path().resource_dir().ok();
-            app.manage(AppState { store: Mutex::new(store), db_path, resource_dir, cancel_deploy: std::sync::atomic::AtomicBool::new(false) });
+            app.manage(AppState { store: Mutex::new(store), db_path, resource_dir, cancel_deploy: std::sync::atomic::AtomicBool::new(false), demo: OnceLock::new() });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

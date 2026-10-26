@@ -27,6 +27,7 @@ tvs-recovery.workspace = true
 tvs-launcher.workspace = true
 tvs-deploy.workspace = true
 tvs-insight.workspace = true
+tvs-demo.workspace = true
 regex.workspace = true
 base64 = "0.22"
 

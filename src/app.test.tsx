@@ -37,8 +37,8 @@ describe("planned sections", () => {
 
 describe("ipc schemas", () => {
   it("accept the Rust shapes and reject drift", () => {
-    expect(AppSettings.safeParse({ ui_mode: "beginner", adb_path: "", default_dry_run: true, batch_size: 5, check_updates: false, reduced_motion_ui: false }).success).toBe(true);
-    expect(AppSettings.safeParse({ ui_mode: "expert", adb_path: "", default_dry_run: true, batch_size: 5, check_updates: false, reduced_motion_ui: false }).success).toBe(false);
+    expect(AppSettings.safeParse({ ui_mode: "beginner", adb_path: "", default_dry_run: true, batch_size: 5, check_updates: false, reduced_motion_ui: false, demo_mode: false }).success).toBe(true);
+    expect(AppSettings.safeParse({ ui_mode: "expert", adb_path: "", default_dry_run: true, batch_size: 5, check_updates: false, reduced_motion_ui: false, demo_mode: false }).success).toBe(false);
     expect(DeviceEntry.safeParse({ serial: "192.168.1.50:5555", state: "unauthorized", model: null, product: null }).success).toBe(true);
   });
 

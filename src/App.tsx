@@ -3,7 +3,7 @@ import { SECTIONS, visibleSections, type SectionId } from "./app/sections";
 import { api, IpcError, type AppSettings } from "./lib/ipc";
 import { Dashboard } from "./pages/Dashboard";
 import { Planned } from "./pages/Planned";
-import { SettingsPage } from "./pages/SettingsPage";
+import { DEMO_ADDRESS, DEMO_CODE, SettingsPage } from "./pages/SettingsPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { InspectorPage } from "./pages/InspectorPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
@@ -48,6 +48,11 @@ export function App() {
     try { setSettings(await api.saveSettings(next)); } catch (e) { setLoadErr(e instanceof IpcError ? e.message : String(e)); }
   }
 
+  async function setDemo(on: boolean) {
+    if (!settings) return;
+    try { setSettings(await api.saveSettings({ ...settings, demo_mode: on })); setSerial(null); } catch (e) { setLoadErr(e instanceof IpcError ? e.message : String(e)); }
+  }
+
   return (
     <div className="flex h-full">
       <nav aria-label="Main" className="flex w-60 shrink-0 flex-col border-r border-ink-700 bg-ink-900">
@@ -86,6 +91,12 @@ export function App() {
       </nav>
 
       <main className="flex-1 overflow-y-auto">
+        {settings?.demo_mode && (
+          <div role="status" className="flex items-center justify-between gap-4 border-b border-amber-700/60 bg-amber-950/60 px-8 py-2 text-sm text-amber-200">
+            <span><strong>Demo mode:</strong> simulated TV, nothing real is changed. Connect to {DEMO_ADDRESS} (pairing code {DEMO_CODE}).</span>
+            <button onClick={() => void setDemo(false)} className="shrink-0 rounded-md border border-amber-600/70 px-2 py-0.5 text-xs hover:bg-amber-900">Use a real TV</button>
+          </div>
+        )}
         <header className="flex items-start justify-between gap-6 border-b border-ink-700 px-8 py-5">
           <div>
             <h1 className="text-xl font-semibold">{current.label}</h1>

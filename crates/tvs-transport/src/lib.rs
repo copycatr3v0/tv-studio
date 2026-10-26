@@ -79,6 +79,18 @@ pub trait Transport: Send + Sync {
     fn pull(&self, serial: &Serial, remote: &str, local: &Path) -> Result<()>;
 }
 
+/// A shared transport is a transport (the app hands commands an `Arc<dyn Transport>`: adb or demo).
+impl<T: Transport + ?Sized> Transport for std::sync::Arc<T> {
+    fn devices(&self) -> Result<Vec<DeviceEntry>> { (**self).devices() }
+    fn connect(&self, e: &Serial) -> Result<()> { (**self).connect(e) }
+    fn pair(&self, e: &Serial, c: &PairingCode) -> Result<()> { (**self).pair(e, c) }
+    fn disconnect(&self, e: &Serial) -> Result<()> { (**self).disconnect(e) }
+    fn mdns_services(&self) -> Result<Vec<MdnsService>> { (**self).mdns_services() }
+    fn shell(&self, s: &Serial, c: &ShellCommand) -> Result<ShellOutput> { (**self).shell(s, c) }
+    fn push(&self, s: &Serial, l: &Path, r: &str) -> Result<()> { (**self).push(s, l, r) }
+    fn pull(&self, s: &Serial, r: &str, l: &Path) -> Result<()> { (**self).pull(s, r, l) }
+}
+
 /// Six-digit wireless-debugging pairing code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PairingCode(String);

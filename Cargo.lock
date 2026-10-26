@@ -3720,6 +3720,7 @@ dependencies = [
  "tauri-build",
  "thiserror 1.0.69",
  "tvs-core",
+ "tvs-demo",
  "tvs-deploy",
  "tvs-device",
  "tvs-insight",
@@ -3740,6 +3741,22 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tvs-demo"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tempfile",
+ "tvs-core",
+ "tvs-deploy",
+ "tvs-device",
+ "tvs-insight",
+ "tvs-launcher",
+ "tvs-recovery",
+ "tvs-safety",
+ "tvs-transport",
 ]
 
 [[package]]

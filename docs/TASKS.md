@@ -69,5 +69,14 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [x] Optimization Benchmarks, Privacy & Performance and Diagnostics pages (4 UI tests); all 15 sections functional
 - [ ] Real-TV benchmark repeatability check (two runs, same launcher, should read "no clear change")
 
-## M9–M10
-See PLAN.md. Tasks get broken down when each milestone starts.
+## M9 Integration testing
+- [x] Simulated TCL Google TV (`crates/tvs-demo`), built from CleanYourTV's tested G09 list: 62 packages, setup wizard owning Wi-Fi, TV-input hardware, benchmark and privacy data
+- [x] 13 end-to-end scenarios on it (full deployment + exact revert, multiple / unauthorized TVs, protected packages, plan-to-run changes, invalid configuration, firmware refusing everything, sticky packages, reboot mid-run, interrupted + resume, benchmark repeatability, privacy audit, demo pairing)
+- [x] Found and fixed: an invalid package name in an imported profile was silently skipped; it now blocks the plan
+- [x] Demo mode: Settings toggle (or `TVS_DEMO=1`), banner on every screen, simulated TV with its own identity so it can never share a baseline with a real TCL set (2 UI tests)
+- [x] docs/TESTING.md: what the simulator proves and what only a real TV can
+- [ ] Real-TV pass: the checklist in TESTING.md, on at least one Google TV and one Android TV
+- [ ] Automated UI run of the desktop app in demo mode (tauri-driver, Windows only)
+
+## M10
+See PLAN.md.

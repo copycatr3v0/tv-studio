@@ -26,6 +26,7 @@ tvs-recovery = { path = "crates/tvs-recovery" }
 tvs-launcher = { path = "crates/tvs-launcher" }
 tvs-deploy = { path = "crates/tvs-deploy" }
 tvs-insight = { path = "crates/tvs-insight" }
+tvs-demo = { path = "crates/tvs-demo" }
 
 [profile.release]
 lto = true

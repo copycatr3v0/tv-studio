@@ -1,5 +1,7 @@
 # CAPABILITY_MATRIX.md
 
+**Validation status:** every row has been exercised on the simulated TV only (see TESTING.md). None is confirmed on real hardware yet.
+
 Legend: **A** = stock ADB (Mode A, no APK) · **L** = needs Studio Launcher (Mode B) · **M** = manual step on the TV · ✗ = not possible without root (out of scope)
 
 | Capability | Source | Min Android | Notes |
