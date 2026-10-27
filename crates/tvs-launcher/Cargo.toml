@@ -14,7 +14,7 @@ thiserror.workspace = true
 once_cell.workspace = true
 regex.workspace = true
 tempfile.workspace = true
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp", "tiff"] }
 
 [dev-dependencies]
 tvs-recovery.workspace = true

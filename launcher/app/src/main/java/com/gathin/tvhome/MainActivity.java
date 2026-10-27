@@ -432,6 +432,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // the theme's background, so launch looks the same.
         getWindow().setBackgroundDrawable(null);
         wallpaperPlayer = new WallpaperPlayer(this, root, cfg);
+        installCanvas(cfg);
         sky = findViewById(R.id.sky);
         sky.setIntensity(cfg.skyIntensity);
         glass = findViewById(R.id.glass);
@@ -718,9 +719,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             ((TextView) btnSettings).setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_home_settings_pill, 0, 0, 0);
         }
         btnSettings.setOnClickListener(v -> {
-            if (launcherSettingsButton) startActivityForResult(
-                    new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
-            else open(systemIntent(Settings.ACTION_SETTINGS));
+            // With a Studio layout, Home settings (look, style, and the TV's settings one row away) in every mode.
+            // The launcher's settings (with "All settings" one row away) in every mode.
+            openHomeSettings();
         });
         btnReorder = findViewById(R.id.btnReorder);
         btnReorder.setOnClickListener(v -> toggleReorder());
@@ -896,7 +897,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean openLauncherSettingsIfAsked(Intent intent) {
         if (intent == null || !ACTION_LAUNCHER_SETTINGS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
-        startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
+        startActivityForResult(new Intent(this, CanvasSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
         return true;
     }
 
@@ -937,9 +938,42 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         tileRefresh.onStart();
     }
 
+    /** The Studio app's free-canvas layout (layout.json), when present, valid and enabled: drawn over the standard Home. */
+    private CanvasHome canvas;
+
+    /** Classic canvas with its own clock, date or greeting: the standard clock block stays hidden. */
+    private boolean canvasClock;
+    /** The canvas layout's app to open after the TV starts (Studio sets it); used when no on-TV pick is made. */
+    private String canvasOpenOnStart;
+
+    private void openHomeSettings() {
+        startActivityForResult(new Intent(this, CanvasSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
+    }
+
+    private void installCanvas(Config cfg) {
+        LayoutSpec spec = CanvasHome.load(this);
+        if (spec == null) return;
+        canvasOpenOnStart = spec.openOnStart;
+        canvas = new CanvasHome(this, spec, cfg.reducedMotion);
+        FrameLayout.LayoutParams full = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        if (spec.classic()) {
+            // Classic: the standard Home (dock, grid that slides up, glass focus, glow) stays on top and keeps
+            // every key; the canvas replaces the wallpaper and sky underneath it.
+            View skyView = findViewById(R.id.sky);
+            root.addView(canvas, Math.max(0, root.indexOfChild(skyView)), full);
+            skyView.setVisibility(View.GONE);
+            canvasClock = CanvasHome.hasClockWidget(spec);
+            if (canvasClock) findViewById(R.id.leftBlock).setVisibility(View.INVISIBLE);
+            return;
+        }
+        for (int i = 0; i < root.getChildCount(); i++) root.getChildAt(i).setVisibility(View.GONE);
+        root.addView(canvas, full);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        if (canvas != null) canvas.start();
         // A festival that started or ended while Home was in the background: rebuild with or without it.
         if (festive != festival.active(LocalDate.now())) {
             recreate();
@@ -1151,6 +1185,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onPause() {
         super.onPause();
+        if (canvas != null) canvas.stop();
         root.removeCallbacks(showIdleClock);
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
@@ -1269,6 +1304,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 }
                 return true;
             }
+        }
+        // Menu anywhere but on a tile: Settings, so Classic can always get back to the other styles.
+        if (!reordering && openPopup == null && cardPrompt == null && event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) openHomeSettings();
+            return true;
         }
         if (!reordering) return super.dispatchKeyEvent(event);
         if (dockEditing) return dispatchDockEdit(event);
@@ -2466,7 +2506,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void updateClockVisibility() {
         boolean valid = System.currentTimeMillis() >= TIME_VALID_AFTER_MS;
-        clockBlock.setVisibility(valid ? View.VISIBLE : View.INVISIBLE);
+        clockBlock.setVisibility(valid && !canvasClock ? View.VISIBLE : View.INVISIBLE);
         handler.removeCallbacks(clockCheck);
         if (valid) {
             updateGreeting();
@@ -2866,6 +2906,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean openLiveTvAfterBoot() {
         String app = openOnStartChoice ? getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE)
                 .getString(OpenOnStart.KEY, "") : "";
+        if (app.isEmpty() && canvasOpenOnStart != null) app = canvasOpenOnStart;
         if (!bootToLiveTv && app.isEmpty()) return false;
         int boot = OpenOnStart.boot(this);
         SharedPreferences prefs = getSharedPreferences(OpenOnStart.BOOT_PREFS, MODE_PRIVATE);
@@ -3234,13 +3275,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             status.setVisibility(View.VISIBLE);
         }
         addInputRow(rows, popup, R.drawable.ic_swap_vert, getString(R.string.reorder), -1, this::toggleReorder);
-        if (launcherSettingsButton) {
-            addInputRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), -1,
-                    () -> startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
-        } else {
-            addInputRow(rows, popup, R.drawable.ic_settings, getString(R.string.settings), -1,
-                    () -> open(systemIntent(Settings.ACTION_SETTINGS)));
-        }
+        // The launcher's settings; Android's own are its "All settings" row.
+        addInputRow(rows, popup, R.drawable.ic_settings, getString(R.string.settings), -1, this::openHomeSettings);
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
         popup.setWidth(Math.max((int) (220 * density), Math.min(panel.getMeasuredWidth(), (int) (360 * density))));
         dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
@@ -3254,7 +3290,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         LinearLayout rows = panel.findViewById(R.id.rows);
         PopupWindow popup = glassPopup(panel, (int) (200 * density));
         if (!launcherSettingsButton) addSettingsMenuRow(rows, popup, R.string.launcher_settings, () -> startActivityForResult(
-                new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
+                new Intent(this, CanvasSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
         // Firmware that ships its own settings app next to the AOSP one (Xiaomi China is one): the
         // vendor app holds pages the AOSP settings has no row for, such as Account & Security with
         // the ADB switch. Offered here only while one of them is installed.

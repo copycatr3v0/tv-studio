@@ -1,0 +1,61 @@
+package com.gathin.tvhome;
+
+import android.app.usage.UsageEvents;
+import android.app.usage.UsageStatsManager;
+import android.content.Context;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Which app is in front, from the system's usage events. Used only at power-on (HomeKeyService.bootWatch) to tell
+ * Google TV's home from an HDMI input or an app the TV resumed. Needs the usage-access app-op, which Studio grants
+ * with the Home-button helper; without it this answers null and nothing happens. Nothing is stored or sent.
+ */
+final class FrontApp {
+    private FrontApp() {}
+
+    /** Packages that pass through the front while the TV boots; seeing one decides nothing. */
+    static final String[] TRANSIENT = {"com.android.tv.settings", "com.google.android.tungsten.setupwraith", "android", "com.android.systemui"};
+
+    /** The package of the last activity that came to the front in the past minute, or null. */
+    static String current(Context ctx) {
+        try {
+            UsageStatsManager usm = (UsageStatsManager) ctx.getSystemService(Context.USAGE_STATS_SERVICE);
+            if (usm == null) return null;
+            // From before the boot to a little ahead: the clock can still be settling right after power-on.
+            long now = System.currentTimeMillis();
+            long since = now - android.os.SystemClock.elapsedRealtime() - 10 * 60_000L;
+            UsageEvents ev = usm.queryEvents(since, now + 10 * 60_000L);
+            List<String[]> seen = new ArrayList<>();
+            UsageEvents.Event e = new UsageEvents.Event();
+            while (ev != null && ev.hasNextEvent()) {
+                ev.getNextEvent(e);
+                seen.add(new String[]{String.valueOf(e.getEventType()), e.getPackageName()});
+            }
+            String front = lastResumed(seen);
+            if (front == null) android.util.Log.i(HomeKeyService.TAG, "front app: " + seen.size() + " usage events, none resumed");
+            return front;
+        } catch (RuntimeException noAccess) {
+            return null;
+        }
+    }
+
+    /** From {type, package} events in order: the package of the last ACTIVITY_RESUMED (1). */
+    static String lastResumed(List<String[]> events) {
+        String front = null;
+        for (String[] e : events) if ("1".equals(e[0])) front = e[1];
+        return front;
+    }
+
+    enum Boot { OPEN_HOME, OURS, LEAVE, WAIT }
+
+    /** What power-on should do about {@code front}: replace Google TV's home, done (ours), leave an app or input alone, or look again. */
+    static Boot decide(String front, String stockPkg, String own) {
+        if (front == null) return Boot.WAIT;
+        if (front.equals(own)) return Boot.OURS;
+        if (front.equals(stockPkg)) return Boot.OPEN_HOME;
+        for (String t : TRANSIENT) if (t.equals(front)) return Boot.WAIT;
+        return Boot.LEAVE;
+    }
+}

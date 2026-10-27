@@ -50,6 +50,30 @@ public class ThemeProvider extends ContentProvider {
             if (images != null) for (File f : images) if (f.delete()) n++;
             return n;
         }
+        if (dir != null && ThemeFiles.isVideoCollection(uri.getPathSegments())) {
+            File[] videos = new File(dir, ThemeFiles.VIDEO).listFiles((d, name) -> ThemeFiles.videoFile(name));
+            int n = 0;
+            if (videos != null) for (File f : videos) if (f.delete()) n++;
+            return n;
+        }
+        if (dir != null && ThemeFiles.isProfileCollection(uri.getPathSegments())) {
+            File[] pr = new File(dir, Profiles.DIR).listFiles((d, name) -> ThemeFiles.profileFile(name));
+            int n = 0;
+            if (pr != null) for (File f : pr) if (f.delete()) n++;
+            return n;
+        }
+        if (dir != null && ThemeFiles.isTileCollection(uri.getPathSegments())) {
+            File[] tiles = new File(dir, ThemeFiles.TILES).listFiles((d, name) -> LayoutSpec.validTileImage(name));
+            int n = 0;
+            if (tiles != null) for (File f : tiles) if (f.delete()) n++;
+            return n;
+        }
+        if (dir != null && ThemeFiles.isFontCollection(uri.getPathSegments())) {
+            File[] fonts = new File(dir, ThemeFiles.FONTS).listFiles((d, name) -> ThemeFiles.fontFile(name));
+            int n = 0;
+            if (fonts != null) for (File f : fonts) if (f.delete()) n++;
+            return n;
+        }
         try {
             return file(uri).delete() ? 1 : 0;
         } catch (FileNotFoundException e) {

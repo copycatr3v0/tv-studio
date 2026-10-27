@@ -38,7 +38,7 @@ function mockTv(over: Record<string, unknown> = {}) {
     switch (cmd) {
       case "app_info": return { version: "0.1.0", db_path: "x", schema_version: 3, adb: { path: "adb", version: "1.0.41", source: "downloaded" } };
       case "probe_device": return TV;
-      case "launcher_status": return { status: { installed: false, enabled: false, version: null, resolved_home: null, is_resolved_home: false }, apk_bundled: true, schema_launcher_version: "3", focused: null };
+      case "launcher_status": return { status: { installed: false, enabled: false, version: null, resolved_home: null, is_resolved_home: false }, apk_bundled: true, schema_launcher_version: "3", focused: null, google_home_off: [] };
       case "inventory": return INVENTORY;
       case "evaluate_debloat": return { facts: {}, verdicts: Object.fromEntries((args?.packages ?? []).map((p) => [p, p.includes("setupwraith") ? { kind: "Blocked", reason: "It owns the saved Wi-Fi network" } : { kind: "Allowed" }])) };
       case "deploy_plan": return PLAN;
@@ -120,7 +120,7 @@ describe("Guided setup", () => {
   it("won't continue from a blocked plan, and disables the launcher goal when the APK isn't bundled", async () => {
     mockTv({
       deploy_plan: { ...PLAN, runnable: false, steps: [{ id: "debloat-review", title: "Review the app selection", kind: { kind: "debloat_batch" }, depends_on: [], critical: false, preview: { state: "blocked", detail: "x is a launcher" } }] },
-      launcher_status: { status: { installed: false, enabled: false, version: null, resolved_home: null, is_resolved_home: false }, apk_bundled: false, schema_launcher_version: "3", focused: null },
+      launcher_status: { status: { installed: false, enabled: false, version: null, resolved_home: null, is_resolved_home: false }, apk_bundled: false, schema_launcher_version: "3", focused: null, google_home_off: [] },
     });
     render(<Host />);
     fireEvent.click(await screen.findByRole("button", { name: /next: connect/i }));

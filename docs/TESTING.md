@@ -9,9 +9,9 @@ it does not mean a given TV behaves the way the simulator assumes.
 ## How to run
 
 ```powershell
-cargo test --workspace                          # 152 core tests, including the 14 end-to-end scenarios
+cargo test --workspace                          # 162 core tests, including the 14 end-to-end scenarios
 cargo clippy --workspace --all-targets -- -D warnings
-pnpm typecheck; pnpm test                       # 45 UI tests
+pnpm typecheck; pnpm test                       # 65 UI tests
 cd launcher; .\gradlew.bat testReleaseUnitTest lintRelease   # launcher (needs the Android SDK; CI runs it)
 ```
 
@@ -79,5 +79,5 @@ Record each result in TASKS.md with the TV model and firmware. Until then, the c
 
 ## Not automated yet
 
-- Driving the desktop window itself (tauri-driver + WebDriver) only works on Windows. Planned for CI's Windows job; UI behaviour is covered by the 45 component tests in the meantime.
+- Driving the desktop window itself (tauri-driver + WebDriver) only works on Windows. Planned for CI's Windows job; UI behaviour is covered by the 65 component tests in the meantime.
 - The launcher's Android UI is checked by its unit tests and lint, not by an emulator run.

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { IMAGE_ACCEPT, pictureForTheme } from "../theme/media";
+import { FamilyBar } from "../theme/FamilyBar";
 import { Download, ImagePlus, Redo2, Rocket, Save, Trash2, Undo2, Upload } from "lucide-react";
 import { Preview } from "../theme/Preview";
 import { Controls } from "../theme/Controls";
+import { LayoutEditor } from "../theme/LayoutEditor";
+import { defaultLayout } from "../theme/layout";
 import { useTvApps } from "../theme/useTvApps";
 import { validate } from "../theme/schema";
 import type { ThemeEditor } from "../theme/useThemeEditor";
@@ -25,12 +29,14 @@ const readAsText = (f: File) => new Promise<string>((resolve, reject) => {
 
 export function EditorPage({ serial, editor, advanced }: { serial: string | null; editor: ThemeEditor; advanced: boolean }) {
   const { apps, source, packages } = useTvApps(serial);
+  const [editingProfile, setEditingProfile] = useState("");
   const [width, setWidth] = useState(720);
   const box = useRef<HTMLDivElement>(null);
   const [applying, setApplying] = useState(false);
   const [notes, setNotes] = useState<ThemeIssue[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [tab, setTab] = useState<"theme" | "canvas">("theme");
   const importRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const { draft } = editor;
@@ -78,7 +84,7 @@ export function EditorPage({ serial, editor, advanced }: { serial: string | null
   async function onAddImages(files: FileList | null) {
     if (!files?.length) return;
     try {
-      const added = await Promise.all(Array.from(files).slice(0, 30).map(async (f) => ({ name: f.name, url: await readAsDataUrl(f) })));
+      const added = await Promise.all(Array.from(files).slice(0, 30).map((f) => pictureForTheme(f, readAsDataUrl)));
       editor.setWallpapers([...draft.wallpapers, ...added].slice(0, 30));
       if (!("wallpaper" in draft.config)) editor.set("wallpaper", true);
     } catch (e) { setErr(errMsg(e)); }
@@ -115,7 +121,23 @@ export function EditorPage({ serial, editor, advanced }: { serial: string | null
       {notes.length > 0 && <div className="rounded-lg border border-warn-400/40 bg-warn-400/10 px-3 py-2 text-xs text-warn-400">{notes.map((n) => <div key={n.key + n.message}>{n.key}: {n.message}</div>)}</div>}
       {problemCount > 0 && <ErrorNote message={`Fix before applying: ${Object.entries(problems).map(([k, v]) => `${k} ${v}`).join("; ")}`} />}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div role="tablist" className="flex gap-1">
+        {(["theme", "canvas"] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+            className={`rounded-lg px-3 py-1.5 text-sm ${tab === t ? "bg-ink-700 font-medium" : "text-ink-300 hover:bg-ink-800"}`}>{t === "theme" ? "Theme" : "Canvas layout"}</button>
+        ))}
+      </div>
+      {tab === "canvas" && (
+        <div style={{ containerType: "inline-size" }}>
+          <FamilyBar main={draft.layout ?? defaultLayout()} onMain={editor.setLayout} layouts={draft.profileLayouts ?? {}} onLayouts={editor.setProfileLayouts}
+            editing={editingProfile} onEditing={setEditingProfile} apps={apps} serial={serial} />
+          <LayoutEditor key={editingProfile || "main"} tiles={draft.tiles ?? []} onTiles={editor.setTiles} animatedWallpaper={/\.(gif|webp)$/i.test(draft.wallpapers[0]?.name ?? "")}
+            layout={editingProfile ? draft.profileLayouts?.[editingProfile] ?? draft.layout ?? defaultLayout() : draft.layout ?? defaultLayout()}
+            onChange={editingProfile ? (l) => editor.setProfileLayouts({ ...(draft.profileLayouts ?? {}), [editingProfile]: l }) : editor.setLayout} apps={apps} wallpaperUrl={draft.wallpapers[0]?.url ?? null}
+            videos={draft.videos ?? []} onVideos={editor.setVideos} fonts={draft.fonts ?? []} onFonts={editor.setFonts} />
+        </div>
+      )}
+      {tab === "theme" && <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-3">
           <div ref={box}>
             <Preview config={draft.config} apps={apps} wallpaperUrl={draft.wallpapers[0]?.url ?? null} interactive width={width} />
@@ -125,7 +147,7 @@ export function EditorPage({ serial, editor, advanced }: { serial: string | null
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-medium">Wallpapers ({draft.wallpapers.length})</h3>
               <Button onClick={() => imageRef.current?.click()}><ImagePlus size={14} />Add images</Button>
-              <input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => { void onAddImages(e.target.files); e.target.value = ""; }} />
+              <input ref={imageRef} type="file" accept={IMAGE_ACCEPT} multiple hidden onChange={(e) => { void onAddImages(e.target.files); e.target.value = ""; }} />
             </div>
             {draft.wallpapers.length === 0 ? <p className="text-xs text-ink-400">No picture: the background colour is used.</p> : (
               <ul className="flex flex-wrap gap-2">
@@ -145,7 +167,7 @@ export function EditorPage({ serial, editor, advanced }: { serial: string | null
         <div className="max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
           <Controls config={draft.config} onSet={editor.set} onUnset={editor.unset} advanced={advanced} apps={packages} />
         </div>
-      </div>
+      </div>}
       {applying && serial && <ApplyThemeDialog serial={serial} draft={draft} onClose={() => setApplying(false)} />}
     </div>
   );

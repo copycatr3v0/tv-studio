@@ -136,7 +136,7 @@ export const LauncherStatus = z.object({
   resolved_home: z.string().nullable(), is_resolved_home: z.boolean(),
 });
 export type LauncherStatus = z.infer<typeof LauncherStatus>;
-export const LauncherInfo = z.object({ status: LauncherStatus, apk_bundled: z.boolean(), schema_launcher_version: z.string(), focused: z.string().nullable() });
+export const LauncherInfo = z.object({ status: LauncherStatus, apk_bundled: z.boolean(), schema_launcher_version: z.string(), focused: z.string().nullable(), google_home_off: z.array(z.string()) });
 export type LauncherInfo = z.infer<typeof LauncherInfo>;
 export const HomeCheck = z.object({ resolved: z.string().nullable(), focused: z.string().nullable(), verified: z.boolean(), note: z.string().nullable() });
 export type HomeCheck = z.infer<typeof HomeCheck>;
@@ -196,7 +196,7 @@ export type RunResult = z.infer<typeof RunResult>;
 export const Interrupted = z.object({ id: z.number(), started: z.string(), name: z.string(), last_step: z.string().nullable() });
 export const HistoryRow = z.object({ id: z.number(), started: z.string(), finished: z.string().nullable(), status: z.string(), name: z.string(), can_undo: z.boolean() });
 export type HistoryRow = z.infer<typeof HistoryRow>;
-export type ThemeIn = { config: Record<string, unknown>; wallpapers: { name: string; data_base64: string }[]; captions: string | null };
+export type ThemeIn = { config: Record<string, unknown>; wallpapers: { name: string; data_base64: string }[]; captions: string | null; layout?: unknown | null; videos?: { name: string; data_base64: string }[]; fonts?: { name: string; data_base64: string }[]; tiles?: { name: string; data_base64: string }[]; profiles?: { id: string; layout: unknown }[] };
 
 const Stats = z.object({ n: z.number(), median: z.number(), p25: z.number(), p75: z.number(), p95: z.number(), min: z.number(), max: z.number() });
 export const BenchRun = z.object({
@@ -291,10 +291,12 @@ export const api = {
   launcherStatus: (serial: string) => call("launcher_status", LauncherInfo, { serial }),
   installLauncher: (serial: string) => call("install_launcher", LauncherStatus, { serial }),
   makeLauncherHome: (serial: string) => call("make_launcher_home", HomeCheck, { serial }),
+  setGoogleHome: (serial: string, off: boolean) => call("set_google_home", HomeCheck, { serial, off }),
   importTheme: (jsonText: string) => call("import_theme", z.object({ config: z.record(z.unknown()), issues: z.array(ThemeIssue) }), { jsonText }),
-  deployTheme: (serial: string, theme: { config: Record<string, unknown>; wallpapers: { name: string; data_base64: string }[]; captions: string | null }) =>
+  deployTheme: (serial: string, theme: ThemeIn) =>
     call("deploy_theme", ThemeReport, { serial, theme }),
   resetTheme: (serial: string) => call("reset_theme", ThemeReport, { serial }),
+  resetTvPin: (serial: string) => call("reset_tv_pin", z.null(), { serial }),
   saveThemeVersion: (name: string, theme: unknown) => call("save_theme_version", z.number().int(), { name, theme }),
   listThemeVersions: () => call("list_theme_versions", z.array(SavedTheme)),
   loadThemeVersion: (name: string, version: number) => call("load_theme_version", z.unknown(), { name, version }),

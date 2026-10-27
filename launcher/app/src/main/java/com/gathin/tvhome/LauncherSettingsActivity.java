@@ -106,6 +106,7 @@ public final class LauncherSettingsActivity extends Activity {
             reverseRow(rowChoices);
             reverseRow(dockChoices);
         }
+        findViewById(R.id.fullResetChoice).setOnClickListener(v -> confirmFullReset());
         wallpaperChoice = findViewById(R.id.wallpaperChoice);
         wallpaperChoice.setOnClickListener(v -> showWallpaperPicker());
         animationsChoice = findViewById(R.id.animationsChoice);
@@ -267,6 +268,23 @@ public final class LauncherSettingsActivity extends Activity {
         setResult(RESULT_OK);
         choices.edit().putLong(Config.SETTINGS_REVISION_KEY,
                 choices.getLong(Config.SETTINGS_REVISION_KEY, 0) + 1).apply();
+    }
+
+    /** The safety net: asks once (the remote's OK would otherwise be one press from wiping everything), then resets. */
+    private void confirmFullReset() {
+        AlertDialog d = new AlertDialog.Builder(this)
+                .setTitle(R.string.full_reset_title)
+                .setMessage(R.string.full_reset_message)
+                .setNegativeButton(android.R.string.cancel, null)   // focused first: Back or a stray OK keeps everything
+                .setPositiveButton(R.string.full_reset_confirm, (dialog, which) -> {
+                    FullReset.perform(this);
+                    setResult(RESULT_OK);
+                    Toast.makeText(this, R.string.full_reset_done, Toast.LENGTH_LONG).show();
+                    finish();
+                })
+                .create();
+        d.show();
+        d.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
     }
 
     private void setAdvanced(boolean enabled) {

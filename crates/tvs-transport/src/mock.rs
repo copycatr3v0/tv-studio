@@ -35,6 +35,12 @@ pub struct MockDevice {
     pub focused: Option<String>,
     /// Google TV quirk: `set-home-activity` prints Success and changes nothing.
     pub ignore_set_home: bool,
+    /// Home came from the HOME role (add-role-holder), so removing the role gives it back.
+    pub role_home: bool,
+    /// The TV never binds the launcher's Home-button helper (accessibility service).
+    pub no_key_helper: bool,
+    /// Set by a force stop of the launcher: its helper stays unbound until the services list is written again.
+    pub unbound_helpers: bool,
     /// What `pm install -r` answers instead of installing (e.g. `Failure [INSTALL_FAILED_VERIFICATION_FAILURE]`).
     pub install_failure: Option<String>,
     /// Package + Home activity + version a pushed APK installs as.
@@ -55,6 +61,13 @@ pub struct MockDevice {
     pub home_return_ms: u32,
     /// Fake epoch seconds for generated log lines.
     pub log_clock: u64,
+}
+
+impl MockDevice {
+    /// `ignore_set_home` models Google TV's launcher outranking every other Home; only while it is switched on.
+    fn google_home_outranks(&self) -> bool {
+        self.ignore_set_home && self.packages.get("com.google.android.apps.tv.launcherx") != Some(&false)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -203,7 +216,11 @@ impl Transport for MockTransport {
                 if dev.refuse_disable.contains(*pkg) {
                     return fail(format!("java.lang.SecurityException: Shell cannot change component state for {pkg}"), 255);
                 }
-                if !dev.sticky.contains(*pkg) { dev.packages.insert((*pkg).into(), false); }
+                if !dev.sticky.contains(*pkg) {
+                    dev.packages.insert((*pkg).into(), false);
+                    // A switched-off Home no longer answers: the TV falls back to the other Home apps.
+                    if dev.home.as_deref().is_some_and(|h| h.starts_with(&format!("{pkg}/"))) { dev.home = None; }
+                }
                 ok(format!("Package {pkg} new state: disabled-user\n"))
             }
             ["pm", "enable", pkg] | ["pm", "enable", "--user", "0", pkg] => {
@@ -228,9 +245,23 @@ impl Transport for MockTransport {
             }
             ["cmd", "package", "set-home-activity", "--user", "0", comp] => {
                 let pkg = comp.split('/').next().unwrap_or_default();
-                if dev.packages.get(pkg) == Some(&true) && !dev.ignore_set_home { dev.home = Some((*comp).into()); }
+                if dev.packages.get(pkg) == Some(&true) && !dev.google_home_outranks() { if dev.home.as_deref() != Some(*comp) { dev.role_home = false; } dev.home = Some((*comp).into()); }
                 ok("Success\n")
             }
+            ["cmd", "role", "add-role-holder", "--user", "0", "android.app.role.HOME", pkg] => {
+                if dev.packages.get(*pkg) == Some(&true) && !dev.google_home_outranks() { dev.home = dev.home_claimants.iter().find(|c| c.starts_with(*pkg)).cloned(); dev.role_home = true; }
+                ok("Success\n")
+            }
+            ["cmd", "role", "remove-role-holder", "--user", "0", "android.app.role.HOME", pkg] => {
+                // Without the role, Home goes back to the first enabled Home app.
+                if dev.role_home && dev.home.as_deref().is_some_and(|h| h.starts_with(&format!("{pkg}/"))) {
+                    dev.role_home = false;
+                    dev.home = dev.home_claimants.iter().find(|c| !c.starts_with(&format!("{pkg}/")) && dev.packages.get(c.split('/').next().unwrap_or_default()) == Some(&true)).cloned();
+                }
+                ok("Success\n")
+            }
+            ["cmd", "notification", "allow_listener", comp] => { dev.settings_secure.insert("enabled_notification_listeners".into(), (*comp).into()); ok("") }
+            ["cmd", "notification", "disallow_listener", _] => { dev.settings_secure.remove("enabled_notification_listeners"); ok("") }
             ["pm", "install", "-r", path] => {
                 if let Some(f) = &dev.install_failure { return ok(format!("{f}\n")); }
                 let Some(bytes) = dev.files.get(*path) else { return fail(format!("Error: Unable to open file: {path}"), 1) };
@@ -252,7 +283,15 @@ impl Transport for MockTransport {
             }
             ["pm", "grant", pkg, _perm] => if dev.packages.contains_key(*pkg) { ok("") } else { fail(format!("Unknown package: {pkg}"), 1) },
             ["input", "keyevent", "KEYCODE_HOME"] => {
-                dev.focused = dev.home.clone().or_else(|| dev.home_claimants.first().cloned());
+                let first_on = dev.home_claimants.iter().find(|c| dev.packages.get(c.split('/').next().unwrap_or_default()) == Some(&true)).cloned();
+                dev.focused = dev.home.clone().or(first_on);
+                // The launcher's Home-button helper opens the Studio launcher after the system handles Home.
+                let helper = "studio.tvcustomizer.home/com.gathin.tvhome.HomeKeyService";
+                if !dev.no_key_helper && !dev.unbound_helpers && dev.packages.get("studio.tvcustomizer.home") == Some(&true)
+                    && dev.settings_secure.get("accessibility_enabled").map(String::as_str) == Some("1")
+                    && dev.settings_secure.get("enabled_accessibility_services").is_some_and(|v| v.split(':').any(|x| x == helper)) {
+                    dev.focused = dev.home_claimants.iter().find(|c| c.starts_with("studio.tvcustomizer.home/")).cloned().or(dev.focused.take());
+                }
                 if dev.home_return_ms > 0 {
                     if let Some(f) = dev.focused.clone() {
                         let (pkg, cls) = f.split_once('/').unwrap_or_default();
@@ -267,6 +306,10 @@ impl Transport for MockTransport {
             }
             ["am", "force-stop", pkg] => {
                 if dev.focused.as_deref().is_some_and(|f| f.starts_with(&format!("{pkg}/"))) { dev.focused = None; }
+                // Android unbinds a force-stopped app's accessibility services until the list changes again.
+                if let Some(v) = dev.settings_secure.get("enabled_accessibility_services").cloned() {
+                    if v.split(':').any(|x| x.starts_with(&format!("{pkg}/"))) { dev.unbound_helpers = true; }
+                }
                 ok("")
             }
             ["am", "start", "-W", rest @ ..] => {
@@ -281,7 +324,17 @@ impl Transport for MockTransport {
             ["logcat", "-c", ..] => { dev.logcat.clear(); ok("") }
             ["logcat", "-d", ..] => ok(dev.logcat.clone()),
             ["pidof", pkg] => match dev.pids.get(*pkg) { Some(p) => ok(format!("{p}\n")), None => fail("", 1) },
+            ["appops", "set", pkg, op, mode] => {
+                if !dev.packages.contains_key(*pkg) { return fail(format!("Unknown package: {pkg}"), 1); }
+                if *mode == "default" { dev.appops.remove(&format!("{pkg} {op}")); } else { dev.appops.insert(format!("{pkg} {op}"), (*mode).into()); }
+                ok("")
+            }
             ["appops", "get", pkg, "RECORD_AUDIO"] => ok(dev.appops.get(*pkg).cloned().unwrap_or_else(|| "No operations.\n".into())),
+            ["settings", "put", "secure", key, val] => {
+                if *key == "enabled_accessibility_services" { dev.unbound_helpers = false; }
+                dev.settings_secure.insert((*key).into(), (*val).into()); ok("")
+            }
+            ["settings", "delete", "secure", key] => { dev.settings_secure.remove(*key); ok("Deleted 1 rows\n") }
             ["settings", "get", "secure", key] => ok(format!("{}\n", dev.settings_secure.get(*key).cloned().unwrap_or_else(|| "null".into()))),
             ["am", "start", "-n", comp] => {
                 let pkg = comp.split('/').next().unwrap_or_default();
@@ -305,7 +358,7 @@ impl Transport for MockTransport {
             }
             ["content", "delete", "--uri", uri] => {
                 if let Some(path) = provider_path(dev, uri) {
-                    if path.ends_with("/wallpapers") { let pre = format!("{path}/"); dev.files.retain(|k, _| !k.starts_with(&pre)); }
+                    if path.ends_with("/wallpapers") || path.ends_with("/video") || path.ends_with("/fonts") || path.ends_with("/tiles") || path.ends_with("/profiles") { let pre = format!("{path}/"); dev.files.retain(|k, _| !k.starts_with(&pre)); }
                     else { dev.files.remove(&path); }
                 }
                 ok("")

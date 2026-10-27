@@ -722,6 +722,11 @@ final class Config {
         return file != null && file.isFile() ? file.length() + "@" + file.lastModified() : "absent";
     }
 
+    /** The token Studio writes with every Apply (theme_revision), "absent" when there is none. */
+    static String themeRevision(File dir) {
+        return revisionToken(dir == null ? null : new File(dir, THEME_REVISION_NAME));
+    }
+
     private static String revisionToken(File file) {
         if (file == null || !file.isFile() || file.length() > 64) return "absent";
         try (InputStream in = new FileInputStream(file)) {

@@ -1,0 +1,14 @@
+=== Tue 10/27/2026 20:01:25.92 
+Note: C:\dev\tv-studio\launcher\app\src\main\java\com\gathin\tvhome\CanvasHome.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+gradle=0 
+already connected to 192.168.0.66:5555
+Performing Streamed Install
+Success
+C:\dev\tv-studio\diag-shots\tv-main.json: 1 file pushed, 0 skipped. 1.0 MB/s (2835 bytes in 0.003s)
+C:\dev\tv-studio\diag-shots\fam-kids.json: 1 file pushed, 0 skipped. 1.9 MB/s (1665 bytes in 0.001s)
+Deleted 1 rows
+C:\dev\tv-studio\diag-shots\tv-main.json: 1 file pushed, 0 skipped. 6.8 MB/s (2835 bytes in 0.000s)
+C:\dev\tv-studio\diag-shots\fam-kids.json: 1 file pushed, 0 skipped. 4.2 MB/s (1665 bytes in 0.000s)
+Deleted 1 rows
+DONE 

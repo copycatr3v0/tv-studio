@@ -3,6 +3,7 @@
 
 pub mod assets;
 pub mod install;
+pub mod layout;
 pub mod revert;
 pub mod schema;
 pub mod theme;

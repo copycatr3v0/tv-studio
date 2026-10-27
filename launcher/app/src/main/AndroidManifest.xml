@@ -8,6 +8,13 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Weather only: used when a Studio layout turns weather on and the person agreed that the TV may contact
+         Open-Meteo (api.open-meteo.com, geocoding-api.open-meteo.com). Nothing else in the launcher uses the network. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Bluetooth widget: whether Bluetooth is on, on Android 11 and older (12+ needs no permission for that). -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <!-- Watch Next for the canvas layout's "Continue watching" row. Many TVs grant it only to their own launcher; the row then says so. -->
+    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Needed since Android 10 to read the Wi-Fi network name for the network pill. Never requested at
          runtime: build-and-install grants it with pm grant, so lint's Android 12 "ask for COARSE with
@@ -180,6 +187,13 @@
 
         <!-- stock_home_redirect at boot: HomeKeyService opens this invisible activity once, so the screen behind
              it sends a window event when it closes (HomeKeyService.probeAtBoot). -->
+        <!-- Home settings for the Studio canvas layouts: the gear on Home or the Menu key. -->
+        <activity
+            android:name=".CanvasSettingsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+
         <activity
             android:name=".ProbeActivity"
             android:exported="false"
@@ -193,6 +207,29 @@
         <service
             android:name=".ClockDream"
             android:label="@string/dream_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <!-- Now Playing widget: lets the launcher see which media session is playing. Off until Studio allows it. -->
+        <service
+            android:name=".MediaListener"
+            android:label="@string/media_listener_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- The canvas (background and widgets, no apps) as a screensaver; Studio sets it over adb. -->
+        <service
+            android:name=".CanvasDream"
+            android:label="@string/canvas_dream_name"
             android:exported="true"
             android:permission="android.permission.BIND_DREAM_SERVICE">
             <intent-filter>

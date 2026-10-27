@@ -27,7 +27,7 @@ final class WallpaperRotation {
             String name = entry.getName().toLowerCase(Locale.ROOT);
             if (entry.isFile() && entry.length() > 0 && entry.length() <= 10 * 1024 * 1024
                     && (name.endsWith(".jpg") || name.endsWith(".jpeg")
-                    || name.endsWith(".png") || name.endsWith(".webp"))) {
+                    || name.endsWith(".png") || name.endsWith(".webp") || name.endsWith(".gif"))) {
                 result.add(entry);
                 if (result.size() == 100) break;
             }

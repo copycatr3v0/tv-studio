@@ -91,3 +91,34 @@ Status: `[x]` done with tests · `[~]` in progress · `[ ]` open. A task is only
 - [x] SECURITY.md, TESTING.md, README final
 - [ ] Code-signing certificate for the installer (optional; SmartScreen warns without it)
 - [ ] Real-TV validation (TESTING.md checklist): the only thing standing between this and a public release
+
+## M12 — Canvas layout editor and video samples (done, simulator/preview only)
+
+- [x] `layout.json` schema: TS (`src/theme/layout.ts`, zod) and Rust validator (`tvs-launcher/src/layout.rs`), percent coordinates, 10 item kinds, 10 built-in Android fonts, 7 motions, per-item on/off.
+- [x] Editor "Canvas layout" tab: drag, resize, arrow-key nudge, duplicate, delete, per-item font/size/colour/opacity/radius/icon size and shape/motion, background (image, video, colour, gradient, dim, blur). Undo/redo and saved versions include the layout.
+- [x] 5 original looping videos (`tools/make_videos.py` → `public/videos`, ~4.8 MB total): rain, rainy window, foggy window, anime night, anime sakura. User-added mp4/webm supported in the preview.
+- Preview numbers and watch rows are samples; the editor says so.
+
+## M13 — Launcher renders the canvas (code written; NOT yet compiled or run on a TV)
+
+- [x] Launcher: `LayoutSpec` (strict parser, falls back to the standard Home on any problem), `CanvasHome` (positions, fonts, colours, icon shapes, motion, D-pad focus, clock/date/greeting/text, CPU/memory/network, app tiles, recently opened, Continue watching), `VideoBackground` (muted looping MediaPlayer on a TextureView, centre-cropped, paused when another app is in front, still picture on any error, skipped on low-RAM TVs and when the launcher's reduced-motion is on), `StatsSampler`, `WatchNext`.
+- [x] `ThemeFiles`/`ThemeProvider` allow `layout.json` and `video/<name>.mp4|webm` (and deleting the `video` folder); unit tests added.
+- [x] Rust: `ThemeBundle.layout/videos` validated before anything is sent (layout rules, video names, 30 MB × 4 limit, the layout's video must be included), pushed as a set, removed by the next plain theme and by Revert to original. Tested on the simulated TV.
+- [x] Apply dialog sends the canvas; the video is a separate tick-box, off by default, with the performance warning.
+- [ ] **CI / Android Studio must compile and test the launcher** (`LayoutSpecTest`, `ThemeFilesTest` use org.json via a new test dependency). Check the 576 KB APK-size gate still passes.
+- [ ] **Real-TV checks:** canvas appears and every item sits where the editor put it; D-pad moves between tiles; clock/stats update; CPU shows "n/a" on Android 8+ (expected); Continue watching shows titles or the "does not let the launcher read Watch Next" note; video plays smoothly (or is skipped), pauses when an app opens and resumes; Home key from an app returns to the canvas; Revert to original brings back the stock Home and deletes layout and video; a benchmark with and without video.
+- Known limits: blur is preview-only; Watch Next shows titles only (no posters); app artwork is the TV's banner or icon.
+
+## M13b — "Full reset" on the TV (code written; not yet compiled or run on a TV)
+
+- [x] Launcher settings → **Full reset** (bottom row, with a hint): asks once (Cancel is focused first), then deletes config, layout, wallpapers, videos and `theme_revision`, clears every launcher preference file, bumps the change counter so Home rebuilds, and closes settings. Touches only the launcher's own storage. `FullResetTest` covers the file part.
+- [ ] Real-TV check: apply a canvas + video, open Launcher settings with the remote, Full reset, confirm Home returns to the built-in look and nothing else on the TV changed. (It does not make the stock launcher Home again; use Revert to original on the PC for that, or the TV's Home picker.)
+
+## M14 — Desktop-widget looks (code written; launcher part NOT yet compiled on Android)
+
+- [x] New items: month calendar, animated bars (bars / mirrored / dots; decoration only, not real audio), shape (panel, circle, line, ring). Clock looks: digital, stacked, analog. Date looks (weekday, full, short…). CPU/memory/network as text, bar, ring or graph. Letter spacing, CAPITALS, shadow, italic. Font sizes up to 400. App rows can show only chosen apps. Reorder (front/back).
+- [x] Your own font files (.ttf/.otf, ≤ 4 MB, ≤ 6) copied to the launcher's `fonts/` folder; named in the layout as `file:<name>`; checked before sending; removed by Revert, Full reset and the next plain theme.
+- [x] 8 ready-made looks in the editor (all original, built-in fonts only, all validated by tests).
+- [x] Launcher: `Widgets` (StatView, AnalogClockView, CalendarView, VisualizerView, ShapeView), CanvasHome wiring, LayoutSpec/ThemeFiles/ThemeProvider/FullReset extended. Parser and file-name tests ran here against a stand-in JSON library; Android drawing code compiles only in CI.
+- [ ] Real-TV checks: each look matches the editor preview; fonts load; ring/bar/graph update; visualiser animates only while Home is showing; analog clock hands move; calendar highlights today.
+- Not built (needs a decision): weather (needs internet permission for the launcher), now-playing music (needs notification access), real audio-reactive bars (not possible for a launcher).

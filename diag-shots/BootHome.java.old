@@ -1,0 +1,49 @@
+package com.gathin.tvhome;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.os.Build;
+import android.provider.Settings;
+
+/**
+ * Power-on on Google TV: Android starts its own launcher first and binds the Home-button helper (HomeKeyService)
+ * only some 30-40 s later, so Google TV stayed on screen that long. This opens the Studio launcher as soon as the
+ * boot finishes instead.
+ *
+ * Only when all hold: Studio turned the helper on (the person made this launcher Home), Google's launcher still
+ * answers Home, and Studio granted "display over other apps", which is what lets an app open a screen from the
+ * background on Android 10+. Nothing is ever drawn over other apps. Opened like an app, not as a Home intent, for
+ * the same reason HomeKeyService.openHome gives (the stock launcher keeps the remote's app buttons working).
+ */
+public class BootHome extends BroadcastReceiver {
+    static final String HELPER = "/com.gathin.tvhome.HomeKeyService";
+
+    @Override
+    public void onReceive(Context ctx, Intent intent) {
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
+        String services = Settings.Secure.getString(ctx.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        ResolveInfo home = ctx.getPackageManager().resolveActivity(
+                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY);
+        String resolved = home == null ? null : home.activityInfo.packageName;
+        boolean mayOpen = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || Settings.canDrawOverlays(ctx);
+        boolean open = shouldOpen(services, ctx.getPackageName(), resolved, mayOpen);
+        android.util.Log.i(HomeKeyService.TAG, "boot completed: home=" + resolved + " overlay=" + mayOpen + " open=" + open);
+        if (!open) return;
+        try {
+            ctx.startActivity(new Intent(ctx, MainActivity.class).addCategory(Intent.CATEGORY_HOME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+        } catch (RuntimeException refused) {
+            // the firmware refused: the helper still takes over when Android binds it
+        }
+    }
+
+    static boolean shouldOpen(String enabledServices, String own, String resolvedHome, boolean mayOpen) {
+        if (!mayOpen || enabledServices == null || resolvedHome == null) return false;
+        boolean helperOn = false;
+        for (String s : enabledServices.split(":")) if (s.equals(own + HELPER) || s.equals(own + "/.HomeKeyService")) helperOn = true;
+        return helperOn && !HomeKeyService.pickStockHome(resolvedHome, own).isEmpty();
+    }
+}

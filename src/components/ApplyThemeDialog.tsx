@@ -3,7 +3,8 @@ import { CheckCircle2, Circle, Loader2, X, XCircle } from "lucide-react";
 import { api, errMsg, type HomeCheck, type LauncherInfo, type ThemeReport } from "../lib/ipc";
 import type { Draft } from "../theme/useThemeEditor";
 import { Button, ErrorNote } from "./ui";
-import { urlToBase64 as toBase64 } from "../lib/files";
+import { hasVideo, themePayload } from "../theme/payload";
+import { heavyFeatures, LOW_RAM_KB } from "../theme/layout";
 
 type StepState = "todo" | "busy" | "done" | "failed" | "skipped";
 const Icon = ({ s }: { s: StepState }) => s === "done" ? <CheckCircle2 size={16} className="text-accent-400" />
@@ -19,7 +20,14 @@ export function ApplyThemeDialog({ serial, draft, onClose }: { serial: string; d
   const [report, setReport] = useState<ThemeReport | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [withVideo, setWithVideo] = useState(false);
+  const canvas = !!draft.layout?.enabled;
+  const [ramKb, setRamKb] = useState<number | null>(null);
+  const [keepHeavy, setKeepHeavy] = useState(!!draft.layout?.heavyOnLowRam);
+  const heavy = canvas && draft.layout ? heavyFeatures(draft.layout, /\.(gif|webp)$/i.test(draft.wallpapers[0]?.name ?? "")) : [];
+  const lowRam = ramKb !== null && ramKb < LOW_RAM_KB;
 
+  useEffect(() => { api.probe(serial).then((d) => setRamKb(d.ram_total_kb ?? null), () => setRamKb(null)); }, [serial]);
   useEffect(() => { api.launcherStatus(serial).then((i) => { setInfo(i); setMakeHome(!i.status.is_resolved_home); }, (e: unknown) => setErr(errMsg(e))); }, [serial]);
   const set = (k: keyof typeof steps, v: StepState) => setSteps((s) => ({ ...s, [k]: v }));
 
@@ -39,8 +47,8 @@ export function ApplyThemeDialog({ serial, draft, onClose }: { serial: string; d
         set("home", h.verified ? "done" : "failed");
       } else set("home", "skipped");
       set("theme", "busy");
-      const wallpapers = await Promise.all(draft.wallpapers.map(async (w) => ({ name: w.name, data_base64: await toBase64(w.url) })));
-      const r = await api.deployTheme(serial, { config: draft.config as Record<string, unknown>, wallpapers, captions: null });
+      const sent = draft.layout && keepHeavy !== !!draft.layout.heavyOnLowRam ? { ...draft, layout: { ...draft.layout, heavyOnLowRam: keepHeavy } } : draft;
+      const r = await api.deployTheme(serial, await themePayload(sent, withVideo));
       setReport(r);
       set("theme", r.config_verified ? "done" : "failed");
     } catch (e) {
@@ -77,6 +85,23 @@ export function ApplyThemeDialog({ serial, draft, onClose }: { serial: string; d
               </div></li>
               <li className="flex gap-3"><Icon s={steps.theme} /><div>
                 <div className="font-medium">Send the theme ({Object.keys(draft.config).length} settings, {draft.wallpapers.length} wallpaper{draft.wallpapers.length === 1 ? "" : "s"})</div>
+                {canvas && <div className="text-xs text-ink-300">Includes your canvas layout (positions, fonts, motion, clock and numbers). Revert to original removes it.</div>}
+                {hasVideo(draft) && (
+                  <label className="mt-1 flex items-start gap-2 text-xs">
+                    <input type="checkbox" className="mt-0.5 accent-teal-400" disabled={running || done} checked={withVideo} onChange={(e) => setWithVideo(e.target.checked)} />
+                    <span>Also send the video background “{draft.layout?.background.video}”. Off by default: video uses extra CPU and memory and can make a weak TV stutter.
+                      Without it the canvas keeps your still wallpaper. After sending it, run a Benchmark and turn it off if the TV feels slower.</span>
+                  </label>
+                )}
+                {lowRam && heavy.length > 0 && (
+                  <div className="mt-1 rounded border border-warn-400/40 px-2 py-1 text-xs" data-testid="low-ram-warning">
+                    <div className="text-warn-400">This TV has {(ramKb! / 1024 / 1024).toFixed(1)} GB of memory. The {heavy.join(", ")} will stay off on it (still picture, no motion) so Home stays quick.</div>
+                    <label className="mt-1 flex items-start gap-2">
+                      <input type="checkbox" className="mt-0.5 accent-teal-400" disabled={running || done} checked={keepHeavy} onChange={(e) => setKeepHeavy(e.target.checked)} />
+                      <span>Keep them on anyway. Home may stutter and apps may reload more often; untick and apply again to undo.</span>
+                    </label>
+                  </div>
+                )}
                 {report && <div className="text-xs text-ink-400">
                   {report.config_verified ? "Read back from the TV and matches." : "Written, but the read-back did not match."}{" "}
                   {report.restarted ? "Home restarted with the new look." : "It shows the next time the launcher opens."}

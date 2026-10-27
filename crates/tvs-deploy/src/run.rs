@@ -211,6 +211,11 @@ fn execute(t: &dyn Transport, s: &Serial, plan: &Plan, st: &Step, input: &Deploy
             if !press_home(t, s, input.settle, hooks).is_some_and(|f| f.starts_with(&format!("{STUDIO_PKG}/"))) {
                 return Err(Fail::Msg("The Studio launcher is not what opens on Home right now, so the stock launcher stays enabled.".into()));
             }
+            // Home that only opens through the Home-button helper is not a real Home swap: with the stock launcher
+            // gone, Android would hand Home to whatever is next (on Google TV, the setup wizard).
+            if !install::resolved_home(t, s).is_some_and(|h| h.starts_with(&format!("{STUDIO_PKG}/"))) {
+                return Err(Fail::Msg("Home opens the Studio launcher through its Home-button helper, so the stock launcher stays enabled.".into()));
+            }
             let facts = gather_facts(t, s, &installed, std::slice::from_ref(&pkg));
             if let Some(Verdict::Blocked(why)) = evaluate_selection(std::slice::from_ref(&pkg), &facts).get(&pkg) {
                 return Err(Fail::Msg(format!("Kept enabled: {why}")));

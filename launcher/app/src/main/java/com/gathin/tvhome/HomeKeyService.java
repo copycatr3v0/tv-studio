@@ -199,9 +199,9 @@ public class HomeKeyService extends AccessibilityService {
         frontAppScancodes = RemoteKeys.parseFrontAppScancodes(config.appKeys);
         boolean watchFront = !frontAppKeys.isEmpty() || !frontAppScancodes.isEmpty();
         stockHome.clear();
-        stockHomePackage = config.stockHomeRedirect;
-        if (!config.stockHomeRedirect.isEmpty()) {
-            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(config.stockHomeRedirect);
+        stockHomePackage = config.stockHomeRedirect.isEmpty() ? autoStockHome() : config.stockHomeRedirect;
+        if (!stockHomePackage.isEmpty()) {
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(stockHomePackage);
             for (ResolveInfo ri : getPackageManager().queryIntentActivities(home, PackageManager.MATCH_DISABLED_COMPONENTS)) {
                 stockHome.add(ri.activityInfo.name);
             }
@@ -227,6 +227,13 @@ public class HomeKeyService extends AccessibilityService {
             setServiceInfo(info);
         }
         if (!stockHome.isEmpty() || !powerOnLiveTv.isEmpty()) probeAtBoot();
+        // At power-on Google TV's home reports its window as android.widget.FrameLayout, not as its HOME activity,
+        // so the class check below misses it (seen on a Sony BRAVIA, Google TV 12). For the boot window, until the
+        // first key press, any window of the stock launcher brings Home here.
+        if (!stockHome.isEmpty() && SystemClock.elapsedRealtime() < BOOT_WINDOW_MS) {
+            bootHomeUntil = BOOT_WINDOW_MS;
+            android.util.Log.i(TAG, "boot: watching for " + stockHomePackage);
+        }
         armStandbyExit();
         holdAppKeys = RemoteKeys.parseHoldAppKeys(config.appKeys);
         holdAppScancodes = RemoteKeys.parseHoldAppScancodes(config.appKeys);
@@ -254,6 +261,8 @@ public class HomeKeyService extends AccessibilityService {
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
         // power_on_home: the first key after power-on hands the TV to the user (power and wake keys don't count).
+        if (bootHomeUntil != 0 && event.getAction() == KeyEvent.ACTION_DOWN
+                && event.getKeyCode() != KeyEvent.KEYCODE_POWER && event.getKeyCode() != KeyEvent.KEYCODE_WAKEUP) bootHomeUntil = 0;
         if (powerOnUntil != 0 && event.getAction() == KeyEvent.ACTION_DOWN
                 && event.getKeyCode() != KeyEvent.KEYCODE_POWER && event.getKeyCode() != KeyEvent.KEYCODE_WAKEUP) {
             powerOnUntil = 0;
@@ -319,7 +328,19 @@ public class HomeKeyService extends AccessibilityService {
         }
         // stock_home_redirect: the firmware turned the stock launcher back on and its home screen came up.
         CharSequence cls = event.getClassName();
-        if (!stockHome.isEmpty() && cls != null && stockHome.contains(cls.toString())) openHome();
+        if (!stockHome.isEmpty() && cls != null && stockHome.contains(cls.toString())) { openHome(); return; }
+        if (bootRedirect(stockHomePackage, event.getPackageName(), SystemClock.elapsedRealtime(), bootHomeUntil)) {
+            android.util.Log.i(TAG, "boot: " + event.getPackageName() + "/" + cls + " in front, opening Home");
+            openHome();
+        }
+    }
+
+    static final String TAG = "TvsHome";
+    /** Uptime until which any stock launcher screen is sent back here (power-on); 0 after the first key press. */
+    private long bootHomeUntil;
+
+    static boolean bootRedirect(String stockPkg, CharSequence pkg, long now, long armedUntil) {
+        return stockPkg != null && !stockPkg.isEmpty() && pkg != null && stockPkg.contentEquals(pkg) && now < armedUntil;
     }
 
     /** How long power_on_home stays armed after the screen turns on without a reboot. */
@@ -413,6 +434,7 @@ public class HomeKeyService extends AccessibilityService {
     }
 
     private void openHome() {
+        android.util.Log.i(TAG, "open Home");
         Intent open = stockHomeStays() ? new Intent(this, MainActivity.class)
                 : new Intent(Intent.ACTION_MAIN).setPackage(getPackageName());
         startActivity(open.addCategory(Intent.CATEGORY_HOME)
@@ -432,6 +454,23 @@ public class HomeKeyService extends AccessibilityService {
         ResolveInfo home = getPackageManager().resolveActivity(
                 new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY);
         return home != null && stockHomePackage.equals(home.activityInfo.packageName);
+    }
+
+    /** Google's TV launchers outrank any installed Home, so Studio turns this service on for them. */
+    static final String[] KNOWN_STOCK_HOMES = {
+            "com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher", "com.google.android.leanbacklauncher"};
+
+    /** With stock_home_redirect unset: the stock launcher that still answers Home, if it is one we know. */
+    private String autoStockHome() {
+        ResolveInfo home = getPackageManager().resolveActivity(
+                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY);
+        return pickStockHome(home == null ? null : home.activityInfo.packageName, getPackageName());
+    }
+
+    static String pickStockHome(String resolved, String own) {
+        if (resolved == null || resolved.equals(own)) return "";
+        for (String k : KNOWN_STOCK_HOMES) if (k.equals(resolved)) return k;
+        return "";
     }
 
     @Override

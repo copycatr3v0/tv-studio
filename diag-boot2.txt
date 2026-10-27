@@ -1,0 +1,56 @@
+=== Tue 10/27/2026 20:06:15.66 
+gradle=0 
+already connected to 192.168.0.66:5555
+Performing Streamed Install
+Success
+Deleted 1 rows
+GET_USAGE_STATS: default
+--- reboot 
+32.28
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+34.09
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+40.04
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+42.02
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+44.02
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+46.05
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+50.00
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+52.04
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+54.05
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+56.04
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+57.99
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+60.06
+    mResumedActivity: ActivityRecord{5f8503 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t658}
+Failed to write while dumping service activity: Broken pipe
+No operations.
+Default mode: default
+5
+--------- beginning of main
+10-27 20:07:05.154  4135  4135 I TvsHome : boot: watching for com.google.android.apps.tv.launcherx
+10-27 20:07:05.667  4135  4135 I TvsHome : boot: com.google.android.apps.tv.launcherx/android.widget.FrameLayout in front, opening Home
+10-27 20:07:05.667  4135  4135 I TvsHome : open Home
+10-27 20:07:09.940  4135  4135 I TvsHome : open Home
+10-27 20:07:05.063  3107  3526 I ActivityTaskManager: START u0 {flg=0x10010000 cmp=studio.tvcustomizer.home/com.gathin.tvhome.ProbeActivity} from uid 10211
+10-27 20:07:05.670  3107  4017 I ActivityTaskManager: START u0 {cat=[android.intent.category.HOME] flg=0x10200000 cmp=studio.tvcustomizer.home/com.gathin.tvhome.MainActivity} from uid 10211
+10-27 20:07:09.942  3107  4806 I ActivityTaskManager: START u0 {cat=[android.intent.category.HOME] flg=0x10200000 cmp=studio.tvcustomizer.home/com.gathin.tvhome.MainActivity} from uid 10211
+DONE 

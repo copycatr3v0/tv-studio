@@ -69,6 +69,7 @@ fn success_without_effect_is_not_verified() {
     let m = MockTransport::new();
     let mut d = tv();
     d.ignore_set_home = true;
+    d.no_key_helper = true;
     m.add_device(SN, d);
     installed(&m);
     let h = make_home(&m, &s(), NOW).unwrap();
@@ -106,6 +107,7 @@ fn bundle() -> ThemeBundle {
         config: json!({"columns": 5, "background_color": "#070A14", "wallpaper": true, "dock_apps": ["com.netflix.ninja"]}),
         wallpapers: vec![("aurora-01.jpg".into(), vec![0xFF, 0xD8, 1, 2, 3])],
         captions: Some("aurora-01.jpg\tAurora\n".into()),
+        ..Default::default()
     }
 }
 
@@ -241,3 +243,248 @@ fn revert_keeps_launcher_when_home_cannot_be_confirmed() {
     assert_eq!(kept.len(), 1);
     assert!(status(&m, &s()).unwrap().installed, "never uninstall the launcher that is still Home");
 }
+
+fn canvas_bundle(video: &str) -> ThemeBundle {
+    let mut b = bundle();
+    b.layout = Some(json!({"version":1,"enabled":true,
+        "background":{"kind":"video","color":"#0b1020","color2":"#27325c","video":video,"dim":0.3,"blur":0},
+        "items":[{"id":"clock-1","kind":"clock","enabled":true,"x":72,"y":5,"w":24,"h":12,
+            "style":{"font":"sans-serif-light","size":72,"color":"#ffffff","opacity":1,"radius":0,"fill":null,"align":"end"},
+            "motion":{"type":"float","speed":1,"amount":20}}]}));
+    b.videos = vec![("rain.mp4".into(), vec![0, 0, 0, 24, b'f', b't', b'y', b'p'])];
+    b
+}
+
+#[test]
+fn canvas_layout_and_video_are_pushed_and_reset_removes_them() {
+    let m = MockTransport::new();
+    m.add_device(SN, tv());
+    installed(&m);
+    make_home(&m, &s(), NOW).unwrap();
+    let r = deploy(&m, &s(), &canvas_bundle("rain"), "rev1").unwrap();
+    assert!(r.written.iter().any(|(n, _)| n == "layout.json") && r.written.iter().any(|(n, _)| n == "video/rain.mp4"));
+    let dir = "/sdcard/Android/data/studio.tvcustomizer.home/files";
+    let files = m.device(SN).unwrap().files;
+    assert!(files.contains_key(&format!("{dir}/layout.json")) && files.contains_key(&format!("{dir}/video/rain.mp4")));
+    // A theme without a canvas removes the old one.
+    deploy(&m, &s(), &bundle(), "rev2").unwrap();
+    let files = m.device(SN).unwrap().files;
+    assert!(!files.contains_key(&format!("{dir}/layout.json")) && !files.contains_key(&format!("{dir}/video/rain.mp4")));
+    deploy(&m, &s(), &canvas_bundle("rain"), "rev3").unwrap();
+    reset(&m, &s(), "rev4").unwrap();
+    let files = m.device(SN).unwrap().files;
+    assert!(!files.contains_key(&format!("{dir}/layout.json")) && !files.contains_key(&format!("{dir}/video/rain.mp4")));
+}
+
+#[test]
+fn a_bad_canvas_sends_nothing() {
+    let m = MockTransport::new();
+    m.add_device(SN, tv());
+    installed(&m);
+    let missing = deploy(&m, &s(), &canvas_bundle("rainy-window"), "r").unwrap_err();
+    assert!(matches!(missing, ThemeError::Invalid(ref v) if v.iter().any(|i| i.key == "layout.background.video")));
+    let mut b = canvas_bundle("rain");
+    b.videos[0].0 = "../evil.mp4".into();
+    assert!(matches!(deploy(&m, &s(), &b, "r"), Err(ThemeError::Invalid(_))));
+    let mut b = canvas_bundle("rain");
+    b.layout.as_mut().unwrap()["items"][0]["style"]["font"] = json!("Papyrus");
+    assert!(matches!(deploy(&m, &s(), &b, "r"), Err(ThemeError::Invalid(_))));
+    let mut b = canvas_bundle("rain");
+    b.videos[0].1 = vec![0; MAX_VIDEO_BYTES + 1];
+    assert!(matches!(deploy(&m, &s(), &b, "r"), Err(ThemeError::Invalid(_))));
+    let mut b = bundle();
+    b.videos = vec![("rain.mp4".into(), vec![1])];
+    assert!(matches!(deploy(&m, &s(), &b, "r"), Err(ThemeError::Invalid(_))), "videos without a layout");
+    assert!(m.device(SN).unwrap().files.is_empty(), "nothing reached the TV");
+}
+
+#[test]
+fn custom_fonts_are_pushed_checked_and_removed() {
+    let m = MockTransport::new();
+    m.add_device(SN, tv());
+    installed(&m);
+    make_home(&m, &s(), NOW).unwrap();
+    let ttf = vec![0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let mut b = canvas_bundle("rain");
+    b.layout.as_mut().unwrap()["items"][0]["style"]["font"] = json!("file:Mont.ttf");
+    // The layout names a font that is not included.
+    assert!(matches!(deploy(&m, &s(), &b, "r"), Err(ThemeError::Invalid(ref v)) if v.iter().any(|i| i.key == "layout.style.font")));
+    b.fonts = vec![("Mont.ttf".into(), ttf.clone())];
+    deploy(&m, &s(), &b, "r1").unwrap();
+    let dir = "/sdcard/Android/data/studio.tvcustomizer.home/files";
+    assert!(m.device(SN).unwrap().files.contains_key(&format!("{dir}/fonts/Mont.ttf")));
+    // Bad names and sizes are refused; fonts without a layout are refused.
+    let mut bad = b.clone(); bad.fonts[0].0 = "../Mont.ttf".into();
+    assert!(matches!(deploy(&m, &s(), &bad, "r"), Err(ThemeError::Invalid(_))));
+    let mut big = b.clone(); big.fonts[0].1 = vec![1; MAX_FONT_BYTES + 1];
+    assert!(matches!(deploy(&m, &s(), &big, "r"), Err(ThemeError::Invalid(_))));
+    let mut nolayout = bundle(); nolayout.fonts = vec![("Mont.ttf".into(), ttf)];
+    assert!(matches!(deploy(&m, &s(), &nolayout, "r"), Err(ThemeError::Invalid(_))));
+    reset(&m, &s(), "r2").unwrap();
+    assert!(!m.device(SN).unwrap().files.contains_key(&format!("{dir}/fonts/Mont.ttf")));
+}
+
+#[test]
+fn google_tv_home_goes_through_the_key_helper_and_back() {
+    let m = MockTransport::new();
+    let mut d = tv();
+    d.ignore_set_home = true;
+    d.settings_secure.insert("enabled_accessibility_services".into(), "com.other/.Svc".into());
+    m.add_device(SN, d);
+    installed(&m);
+    let h = make_home(&m, &s(), NOW).unwrap();
+    assert!(h.verified, "{h:?}");
+    let list = m.device(SN).unwrap().settings_secure["enabled_accessibility_services"].clone();
+    assert_eq!(list, format!("com.other/.Svc:{}", crate::install::HOME_KEY_SERVICE));
+    hand_back_home(&m, &s(), Some(&Component::new(STOCK).unwrap()), NOW).unwrap();
+    assert_eq!(m.device(SN).unwrap().settings_secure["enabled_accessibility_services"], "com.other/.Svc", "other services kept");
+}
+
+#[test]
+fn applying_a_theme_keeps_the_home_key_helper_working() {
+    let m = MockTransport::new();
+    let mut d = tv();
+    d.ignore_set_home = true;
+    m.add_device(SN, d);
+    installed(&m);
+    assert!(make_home(&m, &s(), NOW).unwrap().verified);
+    crate::theme::deploy(&m, &s(), &bundle(), "r1").unwrap();
+    assert!(!m.device(SN).unwrap().unbound_helpers, "helper bound again after the restart");
+    assert!(make_home(&m, &s(), NOW).unwrap().verified);
+}
+
+#[test]
+fn canvas_screensaver_is_set_then_the_tvs_own_one_comes_back() {
+    let m = MockTransport::new();
+    let mut d = tv();
+    d.settings_secure.insert("screensaver_components".into(), "com.google.android.backdrop/.Backdrop".into());
+    d.settings_secure.insert("screensaver_enabled".into(), "1".into());
+    m.add_device(SN, d);
+    installed(&m);
+    let mut b = canvas_bundle("rain");
+    b.layout.as_mut().unwrap()["screensaver"] = json!(true);
+    let r = crate::theme::deploy(&m, &s(), &b, "r1").unwrap();
+    assert_eq!(r.screensaver, Some(true));
+    assert_eq!(m.device(SN).unwrap().settings_secure["screensaver_components"], crate::theme::CANVAS_DREAM);
+    // Applying again keeps the first record of the TV's own screensaver.
+    crate::theme::deploy(&m, &s(), &b, "r2").unwrap();
+    // Switching it off puts the TV's own one back.
+    b.layout.as_mut().unwrap()["screensaver"] = json!(false);
+    let r = crate::theme::deploy(&m, &s(), &b, "r3").unwrap();
+    assert_eq!(r.screensaver, None);
+    assert_eq!(m.device(SN).unwrap().settings_secure["screensaver_components"], "com.google.android.backdrop/.Backdrop");
+}
+
+#[test]
+fn reset_restores_a_screensaver_that_was_unset() {
+    let m = MockTransport::new();
+    m.add_device(SN, tv());
+    installed(&m);
+    let mut b = canvas_bundle("rain");
+    b.layout.as_mut().unwrap()["screensaver"] = json!(true);
+    crate::theme::deploy(&m, &s(), &b, "r1").unwrap();
+    crate::theme::reset(&m, &s(), "r2").unwrap();
+    assert!(!m.device(SN).unwrap().settings_secure.contains_key("screensaver_components"), "deleted, as it was before");
+}
+
+#[test]
+fn profiles_are_sent_as_files_and_reset_removes_them() {
+    let m = MockTransport::new();
+    m.add_device(SN, tv());
+    installed(&m);
+    let mut b = canvas_bundle("rain");
+    b.layout.as_mut().unwrap()["profiles"] = json!([{"id": "kids", "name": "Kids"}]);
+    let mut kids = b.layout.clone().unwrap();
+    kids.as_object_mut().unwrap().remove("profiles");
+    b.profiles = vec![("kids".into(), kids)];
+    crate::theme::deploy(&m, &s(), &b, "r1").unwrap();
+    assert!(m.device(SN).unwrap().files.keys().any(|k| k.ends_with("/profiles/kids.json")));
+    // A profile the main layout does not list is refused before anything is written.
+    let mut bad = b.clone();
+    bad.profiles = vec![("guest".into(), b.profiles[0].1.clone())];
+    assert!(crate::theme::deploy(&m, &s(), &bad, "r2").is_err());
+    crate::theme::reset(&m, &s(), "r3").unwrap();
+    assert!(!m.device(SN).unwrap().files.keys().any(|k| k.contains("/profiles/")));
+    crate::theme::reset_pin(&m, &s()).unwrap();
+    assert!(m.device(SN).unwrap().files.keys().any(|k| k.ends_with("/pin_reset")));
+}
+
+#[test]
+fn now_playing_listener_follows_the_layout_and_reset() {
+    let m = MockTransport::new();
+    m.add_device(SN, tv());
+    installed(&m);
+    let mut b = canvas_bundle("rain");
+    b.layout.as_mut().unwrap()["items"][0]["kind"] = json!("nowplaying");
+    b.layout.as_mut().unwrap()["items"][0].as_object_mut().unwrap().remove("options");
+    crate::theme::deploy(&m, &s(), &b, "r1").unwrap();
+    assert_eq!(m.device(SN).unwrap().settings_secure.get("enabled_notification_listeners").map(String::as_str), Some(crate::theme::MEDIA_LISTENER));
+    crate::theme::reset(&m, &s(), "r2").unwrap();
+    assert!(!m.device(SN).unwrap().settings_secure.contains_key("enabled_notification_listeners"));
+}
+
+fn google_tv() -> MockDevice {
+    let mut d = tv();
+    d.ignore_set_home = true;   // launcherx outranks every installed Home while it is on
+    d
+}
+
+#[test]
+fn google_tv_can_be_switched_off_and_back_on() {
+    let m = MockTransport::new();
+    m.add_device(SN, google_tv());
+    installed(&m);
+    assert!(make_home(&m, &s(), NOW).unwrap().verified);
+    let off = google_home_turn_off(&m, &s(), NOW).unwrap();
+    assert!(off.verified, "{off:?}");
+    assert_eq!(off.focused.as_deref(), Some(STUDIO_HOME));
+    assert_eq!(google_home_off(&m, &s()), vec!["com.google.android.apps.tv.launcherx".to_string()]);
+    assert!(status(&m, &s()).unwrap().is_resolved_home, "the Studio launcher is now the TV's real Home");
+    // Asking again changes nothing.
+    assert!(google_home_turn_off(&m, &s(), NOW).unwrap().verified);
+    assert_eq!(google_home_turn_on(&m, &s()).unwrap(), vec!["com.google.android.apps.tv.launcherx".to_string()]);
+    assert!(google_home_off(&m, &s()).is_empty());
+}
+
+#[test]
+fn google_tv_stays_on_unless_studio_home_already_works() {
+    let m = MockTransport::new();
+    let mut d = google_tv();
+    d.no_key_helper = true;
+    m.add_device(SN, d);
+    let none = google_home_turn_off(&m, &s(), NOW).unwrap();
+    assert!(!none.verified && none.note.unwrap().contains("Install"));
+    installed(&m);
+    let h = google_home_turn_off(&m, &s(), NOW).unwrap();
+    assert!(!h.verified);
+    assert!(h.note.unwrap().contains("Make the Studio launcher Home first"));
+    assert!(google_home_off(&m, &s()).is_empty(), "nothing was switched off");
+}
+
+#[test]
+fn google_tv_comes_straight_back_when_the_switch_does_not_hold() {
+    let m = MockTransport::new();
+    let mut d = google_tv();
+    d.sticky.insert("com.google.android.apps.tv.launcherx".into());   // firmware turns it back on by itself
+    m.add_device(SN, d);
+    installed(&m);
+    make_home(&m, &s(), NOW).unwrap();
+    let h = google_home_turn_off(&m, &s(), NOW).unwrap();
+    assert!(!h.verified);
+    assert!(h.note.unwrap().contains("switched back on"));
+    assert!(google_home_off(&m, &s()).is_empty());
+}
+
+#[test]
+fn hand_back_switches_google_tv_on_first() {
+    let m = MockTransport::new();
+    m.add_device(SN, google_tv());
+    installed(&m);
+    make_home(&m, &s(), NOW).unwrap();
+    assert!(google_home_turn_off(&m, &s(), NOW).unwrap().verified);
+    let back = hand_back_home(&m, &s(), Some(&Component::new(STOCK).unwrap()), NOW).unwrap();
+    assert!(google_home_off(&m, &s()).is_empty());
+    assert!(back.verified, "{back:?}");
+    assert_eq!(back.focused.as_deref(), Some(STOCK));
+}
+

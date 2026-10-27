@@ -1,6 +1,7 @@
 package com.gathin.tvhome;
 
 import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -56,5 +57,13 @@ public class HomeKeyServiceTest {
     @Test public void alwaysGoesHomeAfterScreenOnUntilAKey() {
         assertTrue(HomeKeyService.stillArmed(SOON, SOON + HomeKeyService.SCREEN_ON_WINDOW_MS));
         assertFalse(HomeKeyService.stillArmed(SOON, 0));
+    }
+
+    @Test public void picksOnlyKnownStockHomes() {
+        String own = "studio.tvcustomizer.home";
+        assertEquals("com.google.android.apps.tv.launcherx", HomeKeyService.pickStockHome("com.google.android.apps.tv.launcherx", own));
+        assertEquals("", HomeKeyService.pickStockHome(own, own));
+        assertEquals("", HomeKeyService.pickStockHome("com.google.android.tungsten.setupwraith", own));
+        assertEquals("", HomeKeyService.pickStockHome(null, own));
     }
 }

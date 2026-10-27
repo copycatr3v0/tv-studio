@@ -1,0 +1,21 @@
+=== Tue 10/27/2026 18:48:48.12 
+already connected to 192.168.0.66:5555
+307.43
+    mResumedActivity: ActivityRecord{a7b6c54 u0 com.google.android.apps.tv.launcherx/.home.HomeActivity t642}
+Failed to write while dumping service activity: Broken pipe
+10-27 13:14:05.068 +0000  3275  3275 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.android.tv.settings/.system.FallbackHome (has extras)} from uid 0
+10-27 13:14:05.778 +0000  3275  3275 D AccessibilityManagerService: Ignoring non-encryption-aware service ComponentInfo{studio.tvcustomizer.home/com.gathin.tvhome.InputKeyService}
+10-27 13:14:05.817 +0000  3275  3452 I ActivityManager: Start proc 4322:studio.tvcustomizer.home/u0a211 for service {studio.tvcustomizer.home/com.gathin.tvhome.HomeKeyService}
+10-27 13:14:06.341 +0000  3275  3275 D AccessibilityManagerService: Ignoring non-encryption-aware service ComponentInfo{studio.tvcustomizer.home/com.gathin.tvhome.InputKeyService}
+10-27 13:14:08.997 +0000  3275  3451 V ContentProviderHelper: Installing ContentProviderInfo{name=studio.tvcustomizer.home.theme className=com.gathin.tvhome.ThemeProvider}
+10-27 13:14:09.054 +0000  3275  4100 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.tv.launcherx/.home.HomeActivity (has extras)} from uid 0
+10-27 13:14:11.094 +0000  4551  4551 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1446 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.tv.launcherx, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+10-27 13:14:11.723 +0000  3275  5286 I ActivityTaskManager: START u0 {flg=0x10010000 cmp=studio.tvcustomizer.home/com.gathin.tvhome.ProbeActivity} from uid 10211
+10-27 13:14:14.141 +0000  4551  4551 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1446 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.tv.launcherx, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+10-27 13:14:14.274 +0000  3275  4120 W InputManager-JNI: Input channel object '4dbac16 studio.tvcustomizer.home/com.gathin.tvhome.ProbeActivity (client)' was disposed without first being removed with the input manager!
+10-27 13:14:14.379 +0000  4322  4354 I customizer.hom: Compiler allocated 4295KB to compile com.gathin.tvhome.Config com.gathin.tvhome.Config.load(android.content.Context)
+10-27 13:14:14.629 +0000  4551  4551 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1446 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.tv.launcherx, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+10-27 13:14:16.130 +0000  5975  5975 I cast_shell: [1027/184416.130313:INFO:global_init_android.cc(27)] InitializeBinderChannelJavaClass succeed.
+10-27 13:14:16.667 +0000  5975  6173 I cast_shell: [1027/184416.662824:INFO:setup_state.cc(263)] Setup state changed: SETUP_STATE_UNKNOWN (0) -> SETUP_STATE_CHECKING_GLOBAL_CONNECTIVITY (50)
+10-27 13:14:17.236 +0000  5975  6173 I cast_shell: [1027/184417.236015:INFO:setup_state.cc(263)] Setup state changed: SETUP_STATE_CHECKING_GLOBAL_CONNECTIVITY (50) -> SETUP_STATE_CONNECTED (60)
+DONE 

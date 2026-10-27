@@ -1,0 +1,20 @@
+=== Tue 10/27/2026 18:36:28.29 
+already connected to 192.168.0.66:5555
+--- switch off 
+Package com.google.android.apps.tv.launcherx new state: disabled-user
+Success
+com.google.android.tungsten.setupwraith/.RecoveryActivity
+  ResumedActivity: ActivityRecord{60a9109 u0 com.google.android.tungsten.setupwraith/.RecoveryActivity t716}
+--- reboot with google tv off 
+37.21 32.44
+    mResumedActivity: ActivityRecord{5b1d6a7 u0 com.google.android.apps.tv.launcherx/.home.HomeActivity t642}
+61.41 49.05
+    mResumedActivity: ActivityRecord{5b1d6a7 u0 com.google.android.apps.tv.launcherx/.home.HomeActivity t642}
+MemAvailable:    1140160 kB
+99
+--- switch back on 
+Package com.google.android.apps.tv.launcherx new state: enabled
+com.google.android.apps.tv.launcherx/.home.HomeActivity
+    mResumedActivity: ActivityRecord{61ccfa9 u0 studio.tvcustomizer.home/com.gathin.tvhome.MainActivity t644}
+Failed to write while dumping service activity: Broken pipe
+DONE 

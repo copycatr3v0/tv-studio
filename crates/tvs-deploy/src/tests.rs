@@ -55,7 +55,7 @@ fn everything(apk: &std::path::Path) -> DeployInput {
     p.apply_theme = true;
     DeployInput {
         profile: p,
-        theme: Some(ThemeBundle { config: serde_json::json!({"columns": 5, "background_color": "#070A14"}), wallpapers: vec![], captions: None }),
+        theme: Some(ThemeBundle { config: serde_json::json!({"columns": 5, "background_color": "#070A14"}), wallpapers: vec![], captions: None, ..Default::default() }),
         apk: Some(apk.to_path_buf()), batch_size: 2, settle: Duration::ZERO,
     }
 }
@@ -131,7 +131,7 @@ fn sensitive_apps_need_their_confirmation() {
 #[test]
 fn unconfirmed_home_skips_stock_disable_but_independent_steps_finish() {
     let m = MockTransport::new();
-    m.add_device(SN, { let mut d = tv(); d.ignore_set_home = true; d });
+    m.add_device(SN, { let mut d = tv(); d.ignore_set_home = true; d.no_key_helper = true; d });
     let (_d, a) = apk();
     let input = everything(&a);
     let plan = plan(&m, &s(), &input).unwrap();
@@ -266,4 +266,18 @@ fn drift_after_a_firmware_update_and_repair() {
     let r = run(&m, &s(), &drift.plan, &input, &mut TestHooks::default());
     assert!(r.completed, "{:#?}", r.results);
     assert!(crate::drift::check(&m, &s(), &input, Some(&baseline)).unwrap().in_sync);
+}
+
+#[test]
+fn home_through_key_helper_never_disables_the_stock_launcher() {
+    let m = MockTransport::new();
+    m.add_device(SN, { let mut d = tv(); d.ignore_set_home = true; d });
+    let (_d, a) = apk();
+    let input = everything(&a);
+    let plan = plan(&m, &s(), &input).unwrap();
+    let r = run(&m, &s(), &plan, &input, &mut TestHooks::default());
+    let st = |id: &str| r.results.iter().find(|x| x.id == id).unwrap().status;
+    assert_eq!(st("launcher-home"), StepStatus::Done);
+    assert_eq!(st("launcher-disable-stock"), StepStatus::Failed);
+    assert!(m.device(SN).unwrap().packages["com.google.android.apps.tv.launcherx"], "stock launcher left enabled");
 }

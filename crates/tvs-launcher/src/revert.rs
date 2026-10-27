@@ -23,6 +23,8 @@ pub fn remove_studio_launcher(t: &dyn Transport, serial: &Serial, baseline_home:
         kept.push(back.note.unwrap_or_else(|| "Studio launcher kept: no other launcher is enabled to take over Home.".into()));
         return (changed, kept);
     }
+    // The canvas screensaver lives in the launcher: give the TV its own one back before removing it.
+    if crate::theme::restore_screensaver(t, serial) { changed.push("Screensaver → the TV's previous one".into()); }
     match uninstall(t, serial) {
         Ok(true) => changed.push(format!("Home → {} (confirmed on screen); Studio launcher and its theme files removed",
             back.focused.unwrap_or_else(|| "stock launcher".into()))),

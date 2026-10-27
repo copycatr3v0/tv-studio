@@ -50,7 +50,7 @@ fn g09_input(apk: Option<&std::path::Path>) -> DeployInput {
     }
     DeployInput {
         profile: p,
-        theme: apk.map(|_| ThemeBundle { config: serde_json::json!({"columns": 6, "background_color": "#0B1020"}), wallpapers: vec![], captions: None }),
+        theme: apk.map(|_| ThemeBundle { config: serde_json::json!({"columns": 6, "background_color": "#0B1020"}), wallpapers: vec![], captions: None, ..Default::default() }),
         apk: apk.map(|a| a.to_path_buf()), batch_size: 8, settle: Duration::ZERO,
     }
 }

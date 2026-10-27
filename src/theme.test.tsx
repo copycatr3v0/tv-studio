@@ -10,7 +10,9 @@ import { CATALOG } from "./theme/catalog";
 import { SCHEMA, validate } from "./theme/schema";
 import { useThemeEditor } from "./theme/useThemeEditor";
 import { EditorPage } from "./pages/EditorPage";
+import { LauncherPage } from "./pages/LauncherPage";
 import { ApplyThemeDialog } from "./components/ApplyThemeDialog";
+import { defaultLayout } from "./theme/layout";
 import { Preview } from "./theme/Preview";
 import { SAMPLE_APPS } from "./theme/apps";
 
@@ -98,7 +100,7 @@ describe("apply dialog", () => {
   it("installs, confirms Home on screen, then sends the theme with its wallpaper", async () => {
     globalThis.fetch = vi.fn(async () => ({ blob: async () => new Blob([new Uint8Array([0xff, 0xd8, 1])]) })) as unknown as typeof fetch;
     invoke.mockImplementation(async (cmd: string) => {
-      if (cmd === "launcher_status") return { status: { installed: false, enabled: false, version: null, resolved_home: "com.stock/.Home", is_resolved_home: false }, apk_bundled: true, schema_launcher_version: "3.0-studio.1", focused: null };
+      if (cmd === "launcher_status") return { status: { installed: false, enabled: false, version: null, resolved_home: "com.stock/.Home", is_resolved_home: false }, apk_bundled: true, schema_launcher_version: "3.0-studio.1", focused: null, google_home_off: [] };
       if (cmd === "install_launcher") return { installed: true, enabled: true, version: "3.0-studio.1", resolved_home: "com.stock/.Home", is_resolved_home: false };
       if (cmd === "make_launcher_home") return { resolved: "studio.tvcustomizer.home/com.gathin.tvhome.MainActivity", focused: "studio.tvcustomizer.home/com.gathin.tvhome.MainActivity", verified: true, note: null };
       if (cmd === "deploy_theme") return { written: [["config.json", "provider"]], config_verified: true, restarted: true, focused_after: "studio.tvcustomizer.home/com.gathin.tvhome.MainActivity" };
@@ -115,9 +117,30 @@ describe("apply dialog", () => {
     expect(sent.theme.wallpapers[0]).toEqual({ name: "aurora.jpg", data_base64: "/9gB" });
   });
 
+  it("warns on a low-memory TV and sends heavyOnLowRam only when the person keeps the effects on", async () => {
+    const probe = { serial: "tv:5555", fingerprint: null, brand: null, manufacturer: null, model: "Small TV", device: null, product: null, android_release: "11", sdk: 30,
+      build_id: null, incremental: null, platform: null, adb_secure: null, ram_total_kb: 1_000_000, ram_available_kb: 300_000, data_total_kb: null, data_free_kb: null,
+      package_count: null, disabled_count: null, home: { kind: "unknown" }, home_candidates: [], oem: [],
+      capabilities: { cmd_package: true, studio_launcher: true, wireless_pairing: true, private_dns: true, content_write: true, install_via_pm: true }, findings: [], probe_errors: [] };
+    invoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "probe_device") return probe;
+      if (cmd === "launcher_status") return { status: { installed: true, enabled: true, version: "3.0-studio.1", resolved_home: "studio.tvcustomizer.home/com.gathin.tvhome.MainActivity", is_resolved_home: true }, apk_bundled: true, schema_launcher_version: "3.0-studio.1", focused: null, google_home_off: [] };
+      if (cmd === "deploy_theme") return { written: [], config_verified: true, restarted: true, focused_after: null };
+      throw new Error(cmd);
+    });
+    const layout = { ...defaultLayout(), enabled: true, background: { ...defaultLayout().background, kind: "scene" as const, scene: "snow" as const } };
+    render(<ApplyThemeDialog serial="tv:5555" draft={{ name: "Snow", baseId: "blank", config: {}, wallpapers: [], layout }} onClose={() => {}} />);
+    expect(await screen.findByTestId("low-ram-warning")).toHaveTextContent(/ambient scene will stay off/);
+    fireEvent.click(screen.getByLabelText(/Keep them on anyway/));
+    fireEvent.click(screen.getByRole("button", { name: /Apply now/ }));
+    await waitFor(() => expect(invoke.mock.calls.some((c) => c[0] === "deploy_theme")).toBe(true));
+    const sent = invoke.mock.calls.find((c) => c[0] === "deploy_theme")![1] as { theme: { layout: { heavyOnLowRam?: boolean } } };
+    expect(sent.theme.layout.heavyOnLowRam).toBe(true);
+  });
+
   it("reports an unconfirmed Home honestly", async () => {
     invoke.mockImplementation(async (cmd: string) => {
-      if (cmd === "launcher_status") return { status: { installed: true, enabled: true, version: "3.0-studio.1", resolved_home: "x.y/.Z", is_resolved_home: false }, apk_bundled: true, schema_launcher_version: "3.0-studio.1", focused: null };
+      if (cmd === "launcher_status") return { status: { installed: true, enabled: true, version: "3.0-studio.1", resolved_home: "x.y/.Z", is_resolved_home: false }, apk_bundled: true, schema_launcher_version: "3.0-studio.1", focused: null, google_home_off: [] };
       if (cmd === "make_launcher_home") return { resolved: null, focused: "com.google.android.tungsten.setupwraith/.RecoveryActivity", verified: false, note: "Google TV's setup wizard still answers Home." };
       if (cmd === "deploy_theme") return { written: [], config_verified: true, restarted: false, focused_after: null };
       throw new Error(cmd);
@@ -126,5 +149,26 @@ describe("apply dialog", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Apply now/ }));
     expect(await screen.findByText(/setup wizard still answers Home/)).toBeInTheDocument();
     expect(invoke.mock.calls.some((c) => c[0] === "install_launcher")).toBe(false);
+  });
+});
+
+describe("Google TV switch", () => {
+  it("needs a confirmation, switches Google TV off, and offers to switch it back on", async () => {
+    let off: string[] = [];
+    invoke.mockImplementation(async (cmd: string, args?: { off?: boolean }) => {
+      if (cmd === "list_devices") return [];
+      if (cmd === "launcher_status") return { status: { installed: true, enabled: true, version: "3.0-studio.1", resolved_home: off.length ? "studio.tvcustomizer.home/com.gathin.tvhome.MainActivity" : "com.google.android.apps.tv.launcherx/.home.HomeActivity", is_resolved_home: off.length > 0 }, apk_bundled: true, schema_launcher_version: "3.0-studio.1", focused: null, google_home_off: off };
+      if (cmd === "set_google_home") { off = args!.off ? ["com.google.android.apps.tv.launcherx"] : []; return { resolved: null, focused: "studio.tvcustomizer.home/com.gathin.tvhome.MainActivity", verified: true, note: null }; }
+      return null;
+    });
+    render(<LauncherPage serial="tv:5555" onSelect={() => {}} />);
+    const button = await screen.findByRole("button", { name: /Switch Google TV off/ });
+    expect(screen.getByTestId("google-tv-warning")).toHaveTextContent(/switched off, not removed/);
+    expect(button).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/I understand, switch it off/));
+    fireEvent.click(button);
+    expect(await screen.findByText(/goes straight to the Studio launcher/)).toBeInTheDocument();
+    expect(invoke.mock.calls.find((c) => c[0] === "set_google_home")![1]).toEqual({ serial: "tv:5555", off: true });
+    expect(await screen.findByRole("button", { name: /Switch Google TV back on/ })).toBeInTheDocument();
   });
 });

@@ -42,6 +42,8 @@ pub struct LauncherInfo {
     apk_bundled: bool,
     schema_launcher_version: String,
     focused: Option<String>,
+    /// Google TV launchers switched off on this TV (the opt-in switch).
+    google_home_off: Vec<String>,
 }
 
 #[tauri::command]
@@ -52,6 +54,7 @@ pub async fn launcher_status(app: tauri::AppHandle, serial: String) -> CmdResult
     blocking(move || Ok(LauncherInfo {
         status: install::status(&t, &serial)?,
         focused: install::focused(&t, &serial),
+        google_home_off: install::google_home_off(&t, &serial),
         apk_bundled,
         schema_launcher_version: schema::SCHEMA.launcher_version.clone(),
     })).await
@@ -86,6 +89,26 @@ pub async fn make_launcher_home(app: tauri::AppHandle, serial: String) -> CmdRes
     }).await
 }
 
+/// Opt-in: switch Google TV's launcher off (the Studio launcher becomes the real Home, confirmed on screen, with
+/// Google TV put straight back if not) or back on. Revert and hand-back always switch it back on.
+#[tauri::command]
+pub async fn set_google_home(app: tauri::AppHandle, serial: String, off: bool) -> CmdResult<HomeCheck> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), if off { "Switching Google TV off" } else { "Switching Google TV on" })?;
+    let serial = serial_arg(&serial)?;
+    let t = transport(&app.state::<AppState>())?;
+    let app2 = app.clone();
+    blocking(move || {
+        let settle = std::time::Duration::from_millis(1500);
+        if off {
+            ensure_baseline(&app2, &t, &serial)?;
+            return Ok(install::google_home_turn_off(&t, &serial, settle)?);
+        }
+        let back = install::google_home_turn_on(&t, &serial)?;
+        Ok(HomeCheck { resolved: install::resolved_home(&t, &serial), focused: install::focused(&t, &serial), verified: true,
+            note: Some(if back.is_empty() { "Google TV's launcher was already on.".into() } else { format!("Switched back on: {}.", back.join(", ")) }) })
+    }).await
+}
+
 /// Apps the TV can show as tiles, for the editor's preview and dock picker.
 #[tauri::command]
 pub async fn launchable_apps(app: tauri::AppHandle, serial: String) -> CmdResult<Vec<String>> {
@@ -98,7 +121,13 @@ pub async fn launchable_apps(app: tauri::AppHandle, serial: String) -> CmdResult
 pub struct WallpaperIn { name: String, data_base64: String }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ThemeIn { config: serde_json::Value, #[serde(default)] wallpapers: Vec<WallpaperIn>, #[serde(default)] captions: Option<String> }
+pub struct ThemeIn { config: serde_json::Value, #[serde(default)] wallpapers: Vec<WallpaperIn>, #[serde(default)] captions: Option<String>, #[serde(default)] layout: Option<serde_json::Value>, #[serde(default)] videos: Vec<VideoIn>, #[serde(default)] fonts: Vec<VideoIn>, #[serde(default)] tiles: Vec<VideoIn>, #[serde(default)] profiles: Vec<ProfileIn> }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProfileIn { id: String, layout: serde_json::Value }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VideoIn { name: String, data_base64: String }
 
 #[derive(Debug, Serialize)]
 pub struct ThemeCheck { issues: Vec<Issue> }
@@ -125,13 +154,48 @@ pub(crate) fn bundle_from(input: ThemeIn) -> CmdResult<ThemeBundle> {
     for (i, w) in input.wallpapers.into_iter().enumerate() {
         let bytes = base64::engine::general_purpose::STANDARD.decode(w.data_base64.as_bytes())
             .map_err(|_| CmdError::Invalid(format!("{}: could not read the image data", w.name)))?;
-        let jpg = normalize(&w.name, &bytes).map_err(|e| CmdError::Invalid(e.to_string()))?;
-        let mut name = safe_name(&w.name, i);
-        if !used.insert(name.clone()) { name = format!("{}-{i}.jpg", name.trim_end_matches(".jpg")); used.insert(name.clone()); }
-        wallpapers.push((name, jpg));
+        let (out, ext) = normalize(&w.name, &bytes).map_err(|e| CmdError::Invalid(e.to_string()))?;
+        let mut name = safe_name(&w.name, i, ext);
+        if !used.insert(name.clone()) { name = format!("{}-{i}.{ext}", name.trim_end_matches(&format!(".{ext}"))); used.insert(name.clone()); }
+        wallpapers.push((name, out));
     }
     let captions = input.captions.filter(|c| !c.trim().is_empty() && c.len() <= 16 * 1024);
-    Ok(ThemeBundle { config: input.config, wallpapers, captions })
+    let mut videos = vec![];
+    if input.videos.len() > tvs_launcher::theme::MAX_VIDEOS { return Err(CmdError::Invalid("A theme can carry at most 4 videos.".into())); }
+    for v in input.videos {
+        // Base64 of the size limit is the most a legitimate video can take; refuse anything larger before decoding.
+        if v.data_base64.len() > tvs_launcher::theme::MAX_VIDEO_BYTES / 3 * 4 + 8 { return Err(CmdError::Invalid(format!("{}: the video is too large (60 MB at most).", v.name))); }
+        let bytes = base64::engine::general_purpose::STANDARD.decode(v.data_base64.as_bytes())
+            .map_err(|_| CmdError::Invalid(format!("{}: could not read the video data", v.name)))?;
+        videos.push((v.name, bytes));
+    }
+    let mut fonts = vec![];
+    if input.fonts.len() > tvs_launcher::theme::MAX_FONTS { return Err(CmdError::Invalid("A theme can carry at most 6 font files.".into())); }
+    for f in input.fonts {
+        if f.data_base64.len() > tvs_launcher::theme::MAX_FONT_BYTES / 3 * 4 + 8 { return Err(CmdError::Invalid(format!("{}: the font file is too large (4 MB at most).", f.name))); }
+        let bytes = base64::engine::general_purpose::STANDARD.decode(f.data_base64.as_bytes())
+            .map_err(|_| CmdError::Invalid(format!("{}: could not read the font data", f.name)))?;
+        fonts.push((f.name, bytes));
+    }
+    // Pictures for single apps: re-encoded like wallpapers (metadata and payloads dropped), stills only.
+    if input.tiles.len() > tvs_launcher::theme::MAX_TILES { return Err(CmdError::Invalid("A theme can carry at most 60 app pictures.".into())); }
+    let mut tiles = vec![];
+    for t in input.tiles {
+        if !tvs_launcher::layout::valid_tile_image(&t.name) { return Err(CmdError::Invalid(format!("{}: not a safe picture name", t.name))); }
+        let bytes = base64::engine::general_purpose::STANDARD.decode(t.data_base64.as_bytes())
+            .map_err(|_| CmdError::Invalid(format!("{}: could not read the picture data", t.name)))?;
+        let (out, ext) = normalize(&t.name, &bytes).map_err(|e| CmdError::Invalid(e.to_string()))?;
+        if ext != "jpg" { return Err(CmdError::Invalid(format!("{}: an app picture must be a still picture", t.name))); }
+        if out.len() > tvs_launcher::theme::MAX_TILE_BYTES { return Err(CmdError::Invalid(format!("{}: the picture is too large", t.name))); }
+        tiles.push((t.name, out));
+    }
+    if input.profiles.len() > 3 { return Err(CmdError::Invalid("At most 3 more profiles.".into())); }
+    let mut profiles = vec![];
+    for p in input.profiles {
+        if !tvs_launcher::layout::valid_profile_id(&p.id) { return Err(CmdError::Invalid(format!("{}: not a safe profile id", p.id))); }
+        profiles.push((p.id, p.layout));
+    }
+    Ok(ThemeBundle { config: input.config, wallpapers, captions, layout: input.layout, videos, fonts, tiles, profiles })
 }
 
 #[tauri::command]
@@ -148,6 +212,15 @@ pub async fn deploy_theme(app: tauri::AppHandle, serial: String, theme: ThemeIn)
         ensure_baseline(&app2, &t, &serial)?;
         Ok(theme::deploy(&t, &serial, &bundle, &revision())?)
     }).await
+}
+
+/// Make the TV forget its PIN (locked apps and protected profiles ask for a new one).
+#[tauri::command]
+pub async fn reset_tv_pin(app: tauri::AppHandle, serial: String) -> CmdResult<()> {
+    let _busy = crate::begin_change(&app.state::<AppState>(), "PIN reset")?;
+    let serial = serial_arg(&serial)?;
+    let t = transport(&app.state::<AppState>())?;
+    blocking(move || { theme::reset_pin(&t, &serial)?; Ok(()) }).await
 }
 
 #[tauri::command]
@@ -205,13 +278,13 @@ mod tests {
             image::DynamicImage::ImageRgb8(img).write_to(&mut std::io::Cursor::new(&mut b), image::ImageFormat::Png).unwrap();
             base64::engine::general_purpose::STANDARD.encode(b)
         };
-        let input = ThemeIn { config: serde_json::json!({}), captions: None, wallpapers: vec![
+        let input = ThemeIn { config: serde_json::json!({}), captions: None, layout: None, videos: vec![], fonts: vec![], tiles: vec![], profiles: vec![], wallpapers: vec![
             WallpaperIn { name: "Sky.png".into(), data_base64: png.clone() },
             WallpaperIn { name: "sky.PNG".into(), data_base64: png },
         ] };
         let b = bundle_from(input).unwrap();
         assert_eq!(b.wallpapers.iter().map(|w| w.0.as_str()).collect::<Vec<_>>(), vec!["sky.jpg", "sky-1.jpg"]);
-        let bad = ThemeIn { config: serde_json::json!({}), captions: None, wallpapers: vec![WallpaperIn { name: "x.png".into(), data_base64: "!!".into() }] };
+        let bad = ThemeIn { config: serde_json::json!({}), captions: None, layout: None, videos: vec![], fonts: vec![], tiles: vec![], profiles: vec![], wallpapers: vec![WallpaperIn { name: "x.png".into(), data_base64: "!!".into() }] };
         assert!(bundle_from(bad).is_err());
     }
 }
